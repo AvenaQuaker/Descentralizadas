@@ -7,12 +7,14 @@ contract MultiSignPaymentWallet{
     mapping (address => bool) public isOwner;
 
     struct Transaction{
+        uint id;        
         address to;
         uint amount;
         uint approvalCount;
         bool executed;
     }
     Transaction[] public transactions;
+    uint public nextTransactionId;
     mapping(uint => mapping(address => bool)) public approvals;
     address[] public payees;
     mapping(address=>uint) public shares;
@@ -43,23 +45,22 @@ contract MultiSignPaymentWallet{
         uint256[] memory _shares
     ) {
         _status = 1;
-        require(_owners.length > 0, "Owners required");
+        nextTransactionId = 0;
+        require(_owners.length > 0, "Owners requeridos");
         require(
             _requiredApprovals > 0 && _requiredApprovals <= _owners.length,
-            "Invalid number of required approvals"
+            "numero invalido de aprobadores"
         );
         require(_payees.length == _shares.length, "Payees and shares length mismatch");
 
-        // Registrar owners
         for (uint i = 0; i < _owners.length; i++) {
             address owner = _owners[i];
-            require(owner != address(0), "Invalid owner");
-            require(!isOwner[owner], "Owner not unique");
+            require(owner != address(0), "owner invalido");
+            require(!isOwner[owner], "Owner no unico");
             isOwner[owner] = true;
             owners.push(owner);
         }
 
-        // Registrar payees y shares
         for (uint i = 0; i < _payees.length; i++) {
             address payee = _payees[i];
             uint256 share = _shares[i];
@@ -83,7 +84,9 @@ contract MultiSignPaymentWallet{
     function submitTransaction(address _to,uint _amount) external onlyOwner{
         require(_to!=address(0),"Invalid recipient");
         require(_amount>0,"Amount must be greater than zero");
+        uint txId = nextTransactionId++;
         transactions.push(Transaction({
+            id: txId,   
             to:_to,
             amount:_amount,
             approvalCount:0,
@@ -172,6 +175,7 @@ contract MultiSignPaymentWallet{
 
     event ProductAdded(uint id, string name, uint price, address seller);
     event ProductPurchased(uint id, address buyer, uint price);
+    event ProductUpdated(uint id, string newName, uint newPrice, address updatedBy);
 
     function addProduct(string memory _name, uint _price) external onlyOwner {
         require(_price > 0, "El precio debe ser mayor a 0");
@@ -199,7 +203,46 @@ contract MultiSignPaymentWallet{
         
         emit ProductPurchased(_productId, msg.sender, product.price);
     }
-    
+
+    function buyMultipleProducts(uint[] memory _productIDs) external payable nonRreentrant{
+        uint total = 0;
+
+        for(uint i = 0; i<_productIDs.length; i++){
+            uint _productId = _productIDs[i];
+            Product storage product = products[_productId];
+            require(product.id == _productId, "Producto no existe");
+            require(product.active, "Producto no disponible");
+            total += product.price;
+        }
+
+        require(msg.value == total, "Monto total incorrecto");
+
+        for(uint i = 0; i<_productIDs.length; i++){
+            uint _productId = _productIDs[i];
+            Product storage product = products[_productId];
+            purchases[msg.sender].push(_productId);
+            total += product.price;
+
+            (bool success, ) = product.seller.call{value: msg.value}("");
+            require(success, "Pago al vendedor fallido");
+        
+            emit ProductPurchased(_productId, msg.sender, product.price);
+        }
+
+    }
+
+    function updateProduct(uint _productId, string memory _newName, uint _newPrice) external onlyOwner {
+        Product storage product = products[_productId];
+        require(product.id == _productId, "Producto no existe");
+        require(product.active, "Producto no disponible");
+        require(_newPrice > 0, "El precio debe ser mayor a 0");
+
+        product.name = _newName;
+        product.price = _newPrice;
+
+        emit ProductUpdated(_productId, _newName, _newPrice, msg.sender);
+    }
+
 
     function disableProduct(uint _productId) external onlyOwner {
         products[_productId].active = false;
@@ -212,5 +255,4 @@ contract MultiSignPaymentWallet{
         }
         return all;
     }
-
 }

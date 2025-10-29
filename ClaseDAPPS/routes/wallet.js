@@ -122,6 +122,17 @@ router.post('/disableProduct', async (req, res) => {
     }
 });
 
+router.post('/updateProduct', async (req, res) => {
+    try {
+        const { productId, newName, newPrice, account } = req.body;
+        const result = await walletController.updateProduct(productId, newName, newPrice, account);
+        res.json(result);
+    } catch (error) {
+        console.error('Update product error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 router.get('/getProducts', async (req, res) => {
     try {
         const products = await walletController.getProducts();

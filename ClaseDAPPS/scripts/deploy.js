@@ -8,16 +8,16 @@ const { ethers } = require("hardhat");
 
     console.log("Desplegando contrato...");
     
-    const partes = ["70", "30"];
+    const partes = ["60", "40"];
     const requiredApprovals = 2;
     const multiSingWallet = await ethers.getContractFactory("MultiSignPaymentWallet");
     const wallet = await multiSingWallet.deploy(owners, requiredApprovals, owners, partes);
+    console.log("Direcciones");
+    console.log(owners);
+    console.log("Gas Utilizado")
+    console.log(wallet.deployTransaction.gasPrice);
+    console.log("Adress")
     console.log(wallet.address);
-
-    // const Pagos = await ethers.getContractFactory("Pagos");
-    // const pagos = await Pagos.deploy(owners, partes);
-    // await pagos.deployed();
-    // console.log("Contrato desplegado en:", pagos.address);
     }
 
     multiDeploy()

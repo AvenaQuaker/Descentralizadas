@@ -93,6 +93,27 @@ async function buyProduct(productId, account) {
     }
 }
 
+async function updateProduct(productId, newName, newPrice, account) {
+    try {
+        const wallet = getWallet(account); 
+        const tienda = getContract(WALLET_CONTRACT, contract.abi).connect(wallet);
+
+        const priceInWei = ethers.utils.parseEther(newPrice.toString());
+        const tx = await tienda.updateProduct(productId, newName, priceInWei);
+        const receipt = await tx.wait();
+
+        return {
+            success: true,
+            message: `Producto ${productId} actualizado correctamente`,
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+        };
+    } catch (error) {
+        console.error("Error al actualizar producto:", error);
+        throw error;
+    }
+}
+
 
 async function disableProduct(productId, account){
     return await sendTransaction("disableProduct", [productId], account);
@@ -127,5 +148,6 @@ module.exports = {
     addProduct,
     buyProduct,
     disableProduct,
-    getProducts
+    getProducts,
+    updateProduct
 };
