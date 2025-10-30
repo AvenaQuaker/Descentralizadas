@@ -1,54 +1,54 @@
-require('dotenv').config({path:require('find-config')('.env')});
-const {ethers} = require("ethers");
+require('dotenv').config({path:require('find-config')('.env')})
+const {ethers} = require("ethers")
 const contract = require("../artifacts/contracts/Wallet.sol/MultiSignPaymentWallet.json")
-const { createTransaction,depositToContract,getContract} = require("../utils/contractHelper");
-const { getPublicKey,getWallet } = require('../utils/accountManager');
-const { publickeys } = require('../utils/accountManager');
-const { WALLET_CONTRACT } = process.env;
+const { createTransaction, depositToContract, getContract, getPayeeBalance, updateProduct, setProductActive, releaseToPayee } = require("../utils/contractHelper")
+const { getPublicKey,getWallet } = require('../utils/accountManager')
+const { publickeys } = require('../utils/accountManager')
+const { WALLET_CONTRACT } = process.env
 
 async function sendTransaction(method,params,account){
-    return await createTransaction(WALLET_CONTRACT,contract.abi,method,params,account);
+    return await createTransaction(WALLET_CONTRACT,contract.abi,method,params,account)
 }
 
 async function submitTransaction(to,amount,account){
-    return await sendTransaction("submitTransaction",[to,amount],account);
+    return await sendTransaction("submitTransaction",[to,amount],account)
 }
 
 async function approveTransaction(transactionId,account){
-    return await sendTransaction("approveTransaction",[transactionId],account);
+    return await sendTransaction("approveTransaction",[transactionId],account)
 }
 
 async function executeTransaction(transactionId,account){
-    return await sendTransaction("executeTransaction",[transactionId],account);
+    return await sendTransaction("executeTransaction",[transactionId],account)
 }
 
 async function deposit(amount,account){
     console.log(WALLET_CONTRACT,amount,account)
-    return await depositToContract(WALLET_CONTRACT,contract.abi,amount,account);
+    return await depositToContract(WALLET_CONTRACT,contract.abi,amount,account)
 }
 
 async function releasePayments(account){
-    return await sendTransaction("releasePayments",[],account);
+    return await sendTransaction("releasePayments",[],account)
 }
 
 async function getBalance(){
-    const wallet = getContract(WALLET_CONTRACT,contract.abi);
-    const balance = await wallet.getBalance();
-    console.log("Contract Balance",ethers.utils.formatEther(balance));
-    return balance;
+    const wallet = getContract(WALLET_CONTRACT,contract.abi)
+    const balance = await wallet.getBalance()
+    console.log("Contract Balance",ethers.utils.formatEther(balance))
+    return balance
 }
 
 async function getTransactions(){
-    const walletContract =  await getContract(WALLET_CONTRACT,contract.abi);
-    const transactions = await walletContract.getTransactions();
-    console.log(transactions);
-    return transactions.map(formatTransaction);
+    const walletContract =  await getContract(WALLET_CONTRACT,contract.abi)
+    const transactions = await walletContract.getTransactions()
+    console.log(transactions)
+    return transactions.map(formatTransaction)
 }
 
 async function pruebas(){
-    const wallet = getContract(WALLET_CONTRACT, contract.abi);
-    const tx = await wallet.transactions("0");
-    console.log(tx);
+    const wallet = getContract(WALLET_CONTRACT, contract.abi)
+    const tx = await wallet.transactions("0")
+    console.log(tx)
 }
 
 function formatTransaction(info){
@@ -61,68 +61,46 @@ function formatTransaction(info){
 }
 
 async function getApprovalDetails(){
-    const approvals = await wallet.getApprovalsForTransaction(0);
+    const approvals = await wallet.getApprovalsForTransaction(0)
     approvals.forEach(a => {
-    console.log(`Aprobó: ${a.approver}, Fecha: ${new Date(a.timestamp * 1000)}`);
-});
+    console.log(`Aprobó: ${a.approver}, Fecha: ${new Date(a.timestamp * 1000)}`)
+})
 }
 
 async function addProduct(name, price, account){
-    return await sendTransaction("addProduct", [name, price], account);
+    return await sendTransaction("addProduct", [name, price], account)
 }
 
 async function buyProduct(productId, account) {
     try {
-        const wallet = getWallet(account);
-        const tienda = getContract(WALLET_CONTRACT, contract.abi).connect(wallet);
+        const wallet = getWallet(account)
+        const tienda = getContract(WALLET_CONTRACT, contract.abi).connect(wallet)
 
-        const product = await tienda.products(productId);
-        if (!product.active) throw new Error("Producto no disponible");
+        const product = await tienda.products(productId)
+        if (!product.active) throw new Error("Producto no disponible")
 
-        const tx = await tienda.buyProduct(productId, {value: product.price,});
-        const receipt = await tx.wait();
+        const tx = await tienda.buyProduct(productId, {value: product.price,})
+        const receipt = await tx.wait()
 
         return {
             success: true,
             transactionHash: receipt.transactionHash,
             blockNumber: receipt.blockNumber,
-        };
+        }
     } catch (error) {
-        console.error("Se Rompio algo:", error);
-        throw error;
+        console.error("Se Rompio algo:", error)
+        throw error
     }
 }
-
-async function updateProduct(productId, newName, newPrice, account) {
-    try {
-        const wallet = getWallet(account); 
-        const tienda = getContract(WALLET_CONTRACT, contract.abi).connect(wallet);
-
-        const priceInWei = ethers.utils.parseEther(newPrice.toString());
-        const tx = await tienda.updateProduct(productId, newName, priceInWei);
-        const receipt = await tx.wait();
-
-        return {
-            success: true,
-            message: `Producto ${productId} actualizado correctamente`,
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
-        };
-    } catch (error) {
-        console.error("Error al actualizar producto:", error);
-        throw error;
-    }
-}
-
 
 async function disableProduct(productId, account){
-    return await sendTransaction("disableProduct", [productId], account);
+    return await sendTransaction("disableProduct", [productId], account)
 }
 
 async function getProducts(){
-    const wallet = getContract(WALLET_CONTRACT, contract.abi);
-    const products = await wallet.getAllProducts();
-    return products.map(formatProduct);
+    const wallet = getContract(WALLET_CONTRACT, contract.abi)
+    const products = await wallet.getAllProducts()
+    return products.map(formatProduct)
 }
 
 function formatProduct(info){
@@ -133,6 +111,23 @@ function formatProduct(info){
         active: info.active,
         seller: info.seller
     }
+}
+
+async function payeeBalance(account) {
+    const balance = await getPayeeBalance(account)
+    return ethers.utils.formatEther(balance)
+}
+
+async function updateProductController(productId, newName, newPrice, account) {
+    return await updateProduct(WALLET_CONTRACT, contract.abi, productId, newName, newPrice, account)
+}
+
+async function setProductActiveController(productId, active, account) {
+    return await setProductActive(WALLET_CONTRACT, contract.abi, productId, active, account)
+}
+
+async function releaseToPayeeController(payee, amount, account) {
+    return await releaseToPayee(WALLET_CONTRACT, contract.abi, payee, amount, account)
 }
 
 module.exports = {
@@ -149,5 +144,8 @@ module.exports = {
     buyProduct,
     disableProduct,
     getProducts,
-    updateProduct
-};
+    payeeBalance,
+    updateProductController,
+    setProductActiveController,
+    releaseToPayeeController
+}
