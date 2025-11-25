@@ -3,6 +3,7 @@
     "@nomicfoundation/hardhat-toolbox": "^2.0.1",
     "@openzeppelin/contracts": "^4.9.6",
     "axios": "^1.12.2",
+    "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "ejun": "^0.7.0",
     "express": "^4.21.2",
