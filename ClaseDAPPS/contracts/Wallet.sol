@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 contract MultiSignPaymentWallet {
+
+    // ------------------------------- MULTISIGN ------------------------------------ 
     address[] public owners;
     uint public requiredApprovals;
     mapping(address => bool) public isOwner;
@@ -25,56 +27,52 @@ contract MultiSignPaymentWallet {
 
     uint private _status;
     modifier nonReentrant() {
-        require(_status != 2, "Reentrancy Guard: Reentrant call");
+        require(_status != 2, "Reentrancy Guard: Reentrant");
         _status = 2;
         _;
         _status = 1;
     }
 
-    // Eventos
-    event ContractDeployed(
-        address indexed contractAddress,
-        address[] owners,
-        address[] payees,
-        uint256[] shares,
-        uint requiredApprovals
-    );
+    // --------------------------------- EVENTOS  ---------------------------------- 
+    event ContractDeployed(address indexed contractAddress, address[] owners, address[] payees, uint256[] shares, uint requiredApprovals);
     event Deposit(address indexed sender, uint amount);
-    event TransactionSubmitted(
-        uint indexed txId,
-        address indexed to,
-        uint amount
-    );
+    event TransactionSubmitted(uint indexed txId, address indexed to, uint amount);
     event TransactionApproved(uint indexed txId, address indexed owner);
-    event TransactionExecuted(
-        uint indexed txId,
-        address indexed to,
-        uint amount,
-        bytes32 txHash
-    );
+    event TransactionExecuted(uint indexed txId, address indexed to, uint amount, bytes32 txHash);
     event PaymentReleased(address indexed to, uint amount);
 
-    // Eventos para productos
-    event ProductAdded(
-        uint indexed productId,
-        string name,
-        uint price,
-        address seller
-    );
-    event ProductPurchased(uint indexed productId, address buyer, uint price);
-    event ProductPaymentQueued(
-        uint indexed productId,
-        uint indexed txId,
-        uint amount
-    );
-    event ProductStatusChanged(uint indexed productId, bool active);
+    // --------------------------------- PRODUCTOS ---------------------------------
+    event ProductAdded(uint indexed productId, string name, uint price, uint stock, address seller);
     event ProductUpdated(uint indexed productId, string name, uint price);
+    event ProductStatusChanged(uint indexed productId, bool active);
+    event ProductPurchased(uint indexed productId, address buyer, uint price);
+    event ProductPaymentQueued(uint indexed productId, uint indexed txId, uint amount);
+    event StockAdded(uint indexed productId, uint amount, uint newStock);
+
+    // ---------------------------------- ROLES -------------------------------------
+    enum Role { Customer, Seller, Admin }
+    mapping(address => Role) public roles;
+
+    modifier onlyAdmin() {
+        require(roles[msg.sender] == Role.Admin, "Only admin");
+        _;
+    }
+
+    modifier onlySellerOrAdmin() {
+        require(
+            roles[msg.sender] == Role.Seller ||
+            roles[msg.sender] == Role.Admin,
+            "Only seller or admin"
+        );
+        _;
+    }
 
     modifier onlyOwner() {
         require(isOwner[msg.sender], "Not an owner");
         _;
     }
 
+    // -------------------------------- CONSTRUCTOR ---------------------------------
     constructor(
         address[] memory _owners,
         uint _requiredApprovals,
@@ -83,27 +81,29 @@ contract MultiSignPaymentWallet {
     ) {
         _status = 1;
         nextTransactionId = 0;
+
         require(_owners.length > 0, "Owners required");
-        require(
-            _requiredApprovals > 0 && _requiredApprovals <= _owners.length,
-            "Invalid number of required approvals"
-        );
-        require(_payees.length == _shares.length, "Payees and shares mismatch");
+        require(_requiredApprovals > 0 && _requiredApprovals <= _owners.length);
+        require(_payees.length == _shares.length, "Payees mismatch");
 
         for (uint i = 0; i < _owners.length; i++) {
             address owner = _owners[i];
             require(owner != address(0), "Invalid owner");
             require(!isOwner[owner], "Owner not unique");
+
             isOwner[owner] = true;
             owners.push(owner);
+
+            roles[owner] = Role.Admin; // Owners son admins
         }
 
         for (uint i = 0; i < _payees.length; i++) {
             address payee = _payees[i];
             uint256 share = _shares[i];
             require(payee != address(0), "Invalid payee");
-            require(share > 0, "Share must be greater than zero");
-            require(shares[payee] == 0, "Payee already exists");
+            require(share > 0, "Invalid share");
+            require(shares[payee] == 0, "Payee exists");
+
             payees.push(payee);
             shares[payee] = share;
             totalShares += share;
@@ -111,94 +111,68 @@ contract MultiSignPaymentWallet {
 
         requiredApprovals = _requiredApprovals;
 
-        emit ContractDeployed(
-            address(this),
-            _owners,
-            _payees,
-            _shares,
-            _requiredApprovals
-        );
+        emit ContractDeployed(address(this), _owners, _payees, _shares, _requiredApprovals);
     }
 
+    // ------------------------------ FUNCIONES ----------------------------------
     function deposit() external payable {
-        require(msg.value > 0, "Deposit amount must be greater than zero");
+        require(msg.value > 0);
         emit Deposit(msg.sender, msg.value);
     }
 
     function submitTransaction(address _to, uint _amount) external onlyOwner {
-        require(_to != address(0), "Invalid recipient");
-        require(_amount > 0, "Amount must be greater than zero");
+        require(_to != address(0));
+        require(_amount > 0);
 
         uint txId = nextTransactionId++;
-        bytes32 txHash = keccak256(
-            abi.encodePacked(block.timestamp, _to, _amount, txId)
-        );
+        bytes32 txHash = keccak256(abi.encodePacked(block.timestamp, _to, _amount, txId));
 
-        transactions.push(
-            Transaction({
-                id: txId,
-                to: _to,
-                amount: _amount,
-                approvalCount: 0,
-                executed: false,
-                txHash: txHash
-            })
-        );
-
+        transactions.push(Transaction(txId, _to, _amount, 0, false, txHash));
         emit TransactionSubmitted(txId, _to, _amount);
     }
 
     function approveTransaction(uint txId) external onlyOwner {
-        Transaction storage transaction = transactions[txId];
-        require(!transaction.executed, "Already executed");
-        require(!approvals[txId][msg.sender], "Already approved");
+        Transaction storage t = transactions[txId];
+        require(!t.executed, "Executed");
+        require(!approvals[txId][msg.sender], "Approved");
 
         approvals[txId][msg.sender] = true;
-        transaction.approvalCount++;
+        t.approvalCount++;
 
         emit TransactionApproved(txId, msg.sender);
     }
 
     function executeTransaction(uint txId) external onlyOwner nonReentrant {
-        Transaction storage transaction = transactions[txId];
-        require(
-            transaction.approvalCount >= requiredApprovals,
-            "Not enough approvals"
-        );
-        require(!transaction.executed, "Transaction already executed");
-        require(
-            address(this).balance >= transaction.amount,
-            "Insufficient balance"
-        );
+        Transaction storage t = transactions[txId];
+        require(t.approvalCount >= requiredApprovals);
+        require(!t.executed);
+        require(address(this).balance >= t.amount);
 
-        transaction.executed = true;
-        (bool success, ) = transaction.to.call{value: transaction.amount}("");
-        require(success, "Execution failed");
+        t.executed = true;
+        (bool success,) = t.to.call{value: t.amount}("");
+        require(success);
 
-        emit TransactionExecuted(
-            txId,
-            transaction.to,
-            transaction.amount,
-            transaction.txHash
-        );
+        emit TransactionExecuted(txId, t.to, t.amount, t.txHash);
     }
 
     function releasePayments() external onlyOwner nonReentrant {
         uint balance = address(this).balance;
-        require(balance > 0, "No funds to release");
+        require(balance > 0);
 
         for (uint i = 0; i < payees.length; i++) {
             uint payment = (balance * shares[payees[i]]) / totalShares;
-            (bool success, ) = payees[i].call{value: payment}("");
-            require(success, "Transaction failed");
+            (bool success,) = payees[i].call{value: payment}("");
+            require(success);
             emit PaymentReleased(payees[i], payment);
         }
     }
 
+    // ------------------------------- PRODUCTOS ---------------------------------
     struct Product {
         uint id;
         string name;
         uint price;
+        uint stock;
         address seller;
         bool active;
     }
@@ -206,105 +180,95 @@ contract MultiSignPaymentWallet {
     uint public nextProductId;
     mapping(uint => Product) public products;
 
-    function addProduct(string memory _name, uint _price) external onlyOwner {
-        require(_price > 0, "Price must be greater than zero");
+    // Permitir que admin asigne vendedores
+    function setSeller(address worker) external onlyAdmin {
+        roles[worker] = Role.Seller;
+    }
+
+    // Crear producto
+    function addProduct(string memory _name, uint _price, uint _stock)
+        external
+        onlySellerOrAdmin
+    {
+        require(_price > 0, "Invalid price");
+        require(_stock > 0, "Invalid stock");
 
         uint productId = nextProductId++;
+
         products[productId] = Product({
             id: productId,
             name: _name,
             price: _price,
+            stock: _stock,
             seller: msg.sender,
             active: true
         });
 
-        emit ProductAdded(productId, _name, _price, msg.sender);
+        emit ProductAdded(productId, _name, _price, _stock, msg.sender);
     }
 
-    function buyProduct(uint _productId) external payable nonReentrant {
-        Product storage product = products[_productId];
-        require(product.active, "Product inactive");
-        require(msg.value == product.price, "Incorrect payment");
+    // Agregar stock
+    function addStock(uint productId, uint amount) external onlySellerOrAdmin {
+        Product storage p = products[productId];
+        require(p.active, "Inactive");
+        require(amount > 0, "Invalid amount");
+        require(msg.sender == p.seller || roles[msg.sender] == Role.Admin, "Not seller");
 
-        emit ProductPurchased(_productId, msg.sender, msg.value);
+        p.stock += amount;
+
+        emit StockAdded(productId, amount, p.stock);
+    }
+
+    // Comprar producto
+    function buyProduct(uint productId) external payable nonReentrant {
+        Product storage p = products[productId];
+        require(p.active, "Inactive");
+        require(p.stock > 0, "Out of stock");
+        require(msg.value == p.price, "Incorrect price");
+
+        p.stock -= 1;
+
+        emit ProductPurchased(productId, msg.sender, msg.value);
 
         uint txId = nextTransactionId++;
         bytes32 txHash = keccak256(
-            abi.encodePacked(block.timestamp, product.seller, msg.value, txId)
+            abi.encodePacked(block.timestamp, p.seller, msg.value, txId)
         );
 
-        transactions.push(
-            Transaction({
-                id: txId,
-                to: product.seller,
-                amount: msg.value,
-                approvalCount: 0,
-                executed: false,
-                txHash: txHash
-            })
-        );
+        transactions.push(Transaction(txId, p.seller, msg.value, 0, false, txHash));
 
-        emit TransactionSubmitted(txId, product.seller, msg.value);
-        emit ProductPaymentQueued(_productId, txId, msg.value);
+        emit TransactionSubmitted(txId, p.seller, msg.value);
+        emit ProductPaymentQueued(productId, txId, msg.value);
     }
 
-    function getTransactions() external view returns (Transaction[] memory) {
-        return transactions;
+    // Editar producto
+    function updateProduct(uint productId, string memory newName, uint newPrice)
+        external
+        onlyAdmin
+    {
+        require(newPrice > 0);
+        Product storage p = products[productId];
+        p.name = newName;
+        p.price = newPrice;
+
+        emit ProductUpdated(productId, newName, newPrice);
     }
 
-    function getAllProducts() external view returns (Product[] memory) {
-        Product[] memory all = new Product[](nextProductId);
-        for (uint i = 0; i < nextProductId; i++) {
-            all[i] = products[i];
-        }
-        return all;
+    // Modificar status
+    function setProductActive(uint productId, bool _active) external onlyAdmin {
+        Product storage p = products[productId];
+        p.active = _active;
+        emit ProductStatusChanged(productId, _active);
     }
 
+    // Listar productos
+    function getAllProducts() external view returns (Product[] memory all) {
+        all = new Product[](nextProductId);
+        for (uint i = 0; i < nextProductId; i++) all[i] = products[i];
+    }
+
+    // Mostrar balance
     function getBalance() external view returns (uint) {
         return address(this).balance;
-    }
-
-    function updateProduct(
-        uint _productId,
-        string memory _newName,
-        uint _newPrice
-    ) external onlyOwner {
-        require(_productId < nextProductId, "Invalid product ID");
-        require(_newPrice > 0, "Price must be greater than zero");
-
-        Product storage product = products[_productId];
-        product.name = _newName;
-        product.price = _newPrice;
-
-        emit ProductUpdated(_productId, _newName, _newPrice);
-    }
-
-    function setProductActive(
-        uint _productId,
-        bool _active
-    ) external onlyOwner {
-        require(_productId < nextProductId, "Invalid product ID");
-
-        Product storage product = products[_productId];
-        product.active = _active;
-
-        emit ProductStatusChanged(_productId, _active);
-    }
-
-    // Extra: Liberar fondos ignorando cuenta
-    function releaseToPayee(
-        address _payee,
-        uint _amount
-    ) external onlyOwner nonReentrant {
-        require(_amount > 0, "Amount must be greater than zero");
-        require(
-            address(this).balance >= _amount,
-            "Insufficient contract balance"
-        );
-
-        (bool success, ) = _payee.call{value: _amount}("");
-        require(success, "Transfer failed");
-
-        emit PaymentReleased(_payee, _amount);
     }
 }
