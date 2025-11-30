@@ -8,6 +8,7 @@ contract MultiSignPaymentWallet {
     uint public requiredApprovals;
     mapping(address => bool) public isOwner;
 
+    // Datos de la transaccion
     struct Transaction {
         uint id;
         address to;
@@ -33,7 +34,7 @@ contract MultiSignPaymentWallet {
         _status = 1;
     }
 
-    // --------------------------------- EVENTOS  ---------------------------------- 
+    // --------------------------------- EVENTOS CONTRATOS  ---------------------------------- 
     event ContractDeployed(address indexed contractAddress, address[] owners, address[] payees, uint256[] shares, uint requiredApprovals);
     event Deposit(address indexed sender, uint amount);
     event TransactionSubmitted(uint indexed txId, address indexed to, uint amount);
@@ -41,7 +42,7 @@ contract MultiSignPaymentWallet {
     event TransactionExecuted(uint indexed txId, address indexed to, uint amount, bytes32 txHash);
     event PaymentReleased(address indexed to, uint amount);
 
-    // --------------------------------- PRODUCTOS ---------------------------------
+    // --------------------------------- EVENTOS PRODUCTOS ---------------------------------
     event ProductAdded(uint indexed productId, string name, uint price, uint stock, address seller);
     event ProductUpdated(uint indexed productId, string name, uint price);
     event ProductStatusChanged(uint indexed productId, bool active);
@@ -53,11 +54,13 @@ contract MultiSignPaymentWallet {
     enum Role { Customer, Seller, Admin }
     mapping(address => Role) public roles;
 
+    // Modificador de acceso para rol de admin
     modifier onlyAdmin() {
         require(roles[msg.sender] == Role.Admin, "Only admin");
         _;
     }
 
+    // Modificador de acceso para roles de vendedor y admin
     modifier onlySellerOrAdmin() {
         require(
             roles[msg.sender] == Role.Seller ||
@@ -67,6 +70,7 @@ contract MultiSignPaymentWallet {
         _;
     }
 
+    // Modificador de acceso para owner del contrato
     modifier onlyOwner() {
         require(isOwner[msg.sender], "Not an owner");
         _;
@@ -114,7 +118,7 @@ contract MultiSignPaymentWallet {
         emit ContractDeployed(address(this), _owners, _payees, _shares, _requiredApprovals);
     }
 
-    // ------------------------------ FUNCIONES ----------------------------------
+    // ------------------------------ TRANSACCIONES ----------------------------------
     function deposit() external payable {
         require(msg.value > 0);
         emit Deposit(msg.sender, msg.value);
@@ -168,6 +172,7 @@ contract MultiSignPaymentWallet {
     }
 
     // ------------------------------- PRODUCTOS ---------------------------------
+    // Datos del producto
     struct Product {
         uint id;
         string name;
