@@ -6,7 +6,7 @@ async function createTransaction(contractAddress, abi, method, params, account) 
         const wallet = getWallet(account)
         const contract = new ethers.Contract(contractAddress, abi, wallet)
         
-        // Llamada al método del contrato
+        // Llamada al metodo del contrato
         const tx = await contract[method](...params)
         const receipt = await tx.wait()
         

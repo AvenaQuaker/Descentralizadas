@@ -39,20 +39,20 @@ contract PersonalManager {
     constructor() {
         owner = msg.sender;
 
-        persons[0] = Person({
-            id: 0,
+        persons[1] = Person({
+            id: 1,
             email: "admin@dapps.com",
             passwordHash: keccak256(bytes("admin")),
             username: "admin",
             role: Role.Admin,
-            imageUrl: "",
-            salary: 0,
+            imageUrl: "img/admin.png",
+            salary: 500,
             active: true,
             wallet: msg.sender
         });
 
-        walletToPersonId[msg.sender] = 0;
-        nextPersonId = 1;
+        walletToPersonId[msg.sender] = 1;
+        nextPersonId = 2;
     }
 
     // -------------------------------- PERSONAL -------------------------------
@@ -146,5 +146,34 @@ contract PersonalManager {
         }
 
         return list;
+    }
+
+    // Obtener el usuario segun su wallet MetaMask
+    function getPersonByWallet(address _wallet)
+        external view
+        returns (
+            uint id,
+            string memory email,
+            string memory username,
+            Role role,
+            string memory imageUrl,
+            uint salary,
+            bool active
+        )
+    {
+        uint personId = walletToPersonId[_wallet];
+        require(personId != 0, "Person not found");
+
+        Person memory p = persons[personId];
+
+        return (
+            p.id,
+            p.email,
+            p.username,
+            p.role,
+            p.imageUrl,
+            p.salary,
+            p.active
+        );
     }
 }
