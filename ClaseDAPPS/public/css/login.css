@@ -1,0 +1,17 @@
+@import url("https://fonts.cdnfonts.com/css/fredoka");
+@import url("https://fonts.cdnfonts.com/css/tilt-warp");
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+
+@theme{
+    --font-Fredoka: 'Fredoka', sans-serif;
+    --font-TiltWarp: 'Tilt Warp', sans-serif;
+    --font-Montserrat: 'Montserrat', sans-serif;
+    --bg-crimson: #d9171f;
+    --bg-night: #141414ff;
+    --bg-eblack: #202020ff;
+    --bg-fgray: #d1d5dcff;
+    --bg-antiwhite: #e5e7ebff;
+    --bg-white: #ffffffff;
+}

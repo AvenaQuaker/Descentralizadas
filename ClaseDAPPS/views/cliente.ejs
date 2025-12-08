@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tienda - Cliente</title>
+    <link rel="stylesheet" href="/css/clienteTW.css">
+</head>
+<body class="min-h-screen bg-center bg-cover bg-[url('/images/fondoBlock.jpg')]" >
+
+    <!-- NAVBAR ESTILO BLOCKBUSTER -->
+    <nav class="bb-blue shadow-lg px-6 py-4 flex justify-between items-center border-b-4 border-yellow-400">
+        <h1 class="text-3xl blockbuster-title bb-yellow drop-shadow-lg text-white font-TiltWarp">
+            BLOCKBUSTER STORE
+        </h1>
+
+        <form action="/logout" method="POST">
+            <button 
+                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg 
+                font-semibold shadow-md transition">
+                Cerrar sesión
+            </button>
+        </form>
+
+        <button id="loginMM"
+         class="bg-indigo-600 text-white px-4 py-2 rounded-lg">
+            Iniciar sesión con MetaMask
+        </button>
+    </nav>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div class="max-w-7xl mx-auto px-6 py-10 backdrop-blur-sm rounded-xl mt-10 shadow-xl">
+
+        <!-- GRID DE PRODUCTOS ESTILO BLOCKBUSTER -->
+        <div class="grid gap-8 
+            grid-cols-1 
+            sm:grid-cols-2 
+            md:grid-cols-3 
+            lg:grid-cols-4">
+
+            <% products.forEach(p => { %>
+
+                <div class="bg-[#0032A0] rounded-xl border-4 border-yellow-400 shadow-2xl 
+                            overflow-hidden transition transform hover:scale-105 flex flex-col">
+
+                    <!-- "Carátula" de película -->
+                    <div class="h-48 bg-black flex items-center justify-center">
+                        <span class="text-yellow-400 text-xl font-bold blockbuster-title text-center px-2">
+                            <%= p.name %>
+                        </span>
+                    </div>
+
+                    <!-- CONTENIDO -->
+                    <div class="p-4 text-white flex flex-col flex-grow">
+
+                        <h3 class="text-xl font-bold bb-yellow blockbuster-title">
+                            <%= p.name %>
+                        </h3>
+
+                        <p class="text-gray-200 mt-1 text-sm">
+                            Código de película: <%= p.id %>
+                        </p>
+
+                        <p class="text-yellow-300 font-bold mt-3 text-lg">
+                            <%= p.price %> ETH
+                        </p>
+
+                        <% if (!p.active) { %>
+
+                            <span class="mt-4 py-2 text-center bg-gray-300 text-gray-900 font-semibold rounded-lg">
+                                No disponible
+                            </span>
+
+                        <% } else { %>
+
+                            <!-- BOTÓN AL ESTILO BLOCKBUSTER -->
+                            <form action="/api/wallet/buyProduct" method="POST" class="mt-4">
+                                <input type="hidden" name="productId" value="<%= p.id %>">
+
+                                <button 
+                                    class="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-lg
+                                    hover:bg-yellow-300 transition uppercase shadow-md">
+                                    Rentar ahora
+                                </button>
+                            </form>
+
+                        <% } %>
+
+                    </div>
+                </div>
+
+            <% }) %>
+
+        </div>
+
+    </div>
+<script>
+document.getElementById("loginMM").onclick = async () => {
+    if (!window.ethereum) {
+        return alert("MetaMask no está instalado");
+    }
+
+    try {
+        const accounts = await ethereum.request({
+            method: "eth_requestAccounts"
+        });
+
+        const publicKey = accounts[0];
+
+        console.log(publicKey)
+
+        const data = await res.json();
+
+        if (data.redirect) {
+            window.location.href = data.redirect;
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("Error al conectar con MetaMask");
+    }
+};
+</script>
+</body>
+</html>
