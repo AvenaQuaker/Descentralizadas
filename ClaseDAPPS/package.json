@@ -2,13 +2,18 @@
   "dependencies": {
     "@nomicfoundation/hardhat-toolbox": "^2.0.1",
     "@openzeppelin/contracts": "^4.9.6",
+    "@tailwindcss/cli": "^4.1.17",
     "axios": "^1.12.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
+    "ejs": "^3.1.10",
     "ejun": "^0.7.0",
     "express": "^4.21.2",
+    "express-session": "^1.18.2",
     "find-config": "^1.0.0",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "sweetalert2": "^11.26.3",
+    "tailwindcss": "^4.1.17"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
