@@ -8,7 +8,6 @@ contract MultiSignPaymentWallet {
     uint public requiredApprovals;
     mapping(address => bool) public isOwner;
 
-    // Datos de la transaccion
     struct Transaction {
         uint id;
         address to;
@@ -50,17 +49,19 @@ contract MultiSignPaymentWallet {
     event ProductPaymentQueued(uint indexed productId, uint indexed txId, uint amount);
     event StockAdded(uint indexed productId, uint amount, uint newStock);
 
+    // NUEVOS EVENTOS
+    event SellerEarned(address indexed seller, uint amount);
+    event ProductBoughtByUser(address indexed buyer, uint indexed productId);
+
     // ---------------------------------- ROLES -------------------------------------
     enum Role { Customer, Seller, Admin }
     mapping(address => Role) public roles;
 
-    // Modificador de acceso para rol de admin
     modifier onlyAdmin() {
         require(roles[msg.sender] == Role.Admin, "Only admin");
         _;
     }
 
-    // Modificador de acceso para roles de vendedor y admin
     modifier onlySellerOrAdmin() {
         require(
             roles[msg.sender] == Role.Seller ||
@@ -70,7 +71,6 @@ contract MultiSignPaymentWallet {
         _;
     }
 
-    // Modificador de acceso para owner del contrato
     modifier onlyOwner() {
         require(isOwner[msg.sender], "Not an owner");
         _;
@@ -98,7 +98,7 @@ contract MultiSignPaymentWallet {
             isOwner[owner] = true;
             owners.push(owner);
 
-            roles[owner] = Role.Admin; // Owners son admins
+            roles[owner] = Role.Admin;
         }
 
         for (uint i = 0; i < _payees.length; i++) {
@@ -159,20 +159,7 @@ contract MultiSignPaymentWallet {
         emit TransactionExecuted(txId, t.to, t.amount, t.txHash);
     }
 
-    function releasePayments() external onlyOwner nonReentrant {
-        uint balance = address(this).balance;
-        require(balance > 0);
-
-        for (uint i = 0; i < payees.length; i++) {
-            uint payment = (balance * shares[payees[i]]) / totalShares;
-            (bool success,) = payees[i].call{value: payment}("");
-            require(success);
-            emit PaymentReleased(payees[i], payment);
-        }
-    }
-
     // ------------------------------- PRODUCTOS ---------------------------------
-    // Datos del producto
     struct Product {
         uint id;
         string name;
@@ -185,12 +172,13 @@ contract MultiSignPaymentWallet {
     uint public nextProductId;
     mapping(uint => Product) public products;
 
-    // Permitir que admin asigne vendedores
+    // NUEVO: historial de compras
+    mapping(address => uint[]) public purchases;
+
     function setSeller(address worker) external onlyAdmin {
         roles[worker] = Role.Seller;
     }
 
-    // Crear producto
     function addProduct(string memory _name, uint _price, uint _stock)
         external
         onlySellerOrAdmin
@@ -212,7 +200,6 @@ contract MultiSignPaymentWallet {
         emit ProductAdded(productId, _name, _price, _stock, msg.sender);
     }
 
-    // Agregar stock
     function addStock(uint productId, uint amount) external onlySellerOrAdmin {
         Product storage p = products[productId];
         require(p.active, "Inactive");
@@ -224,7 +211,6 @@ contract MultiSignPaymentWallet {
         emit StockAdded(productId, amount, p.stock);
     }
 
-    // Comprar producto
     function buyProduct(uint productId) external payable nonReentrant {
         Product storage p = products[productId];
         require(p.active, "Inactive");
@@ -235,6 +221,14 @@ contract MultiSignPaymentWallet {
 
         emit ProductPurchased(productId, msg.sender, msg.value);
 
+        // -------- NUEVO: registrar compra del usuario --------
+        purchases[msg.sender].push(productId);
+        emit ProductBoughtByUser(msg.sender, productId);
+
+        // -------- NUEVO: registrar ganancia virtual del seller --------
+        emit SellerEarned(p.seller, msg.value);
+
+        // -------- crear transacción multisig --------
         uint txId = nextTransactionId++;
         bytes32 txHash = keccak256(
             abi.encodePacked(block.timestamp, p.seller, msg.value, txId)
@@ -246,7 +240,6 @@ contract MultiSignPaymentWallet {
         emit ProductPaymentQueued(productId, txId, msg.value);
     }
 
-    // Editar producto
     function updateProduct(uint productId, string memory newName, uint newPrice)
         external
         onlyAdmin
@@ -259,20 +252,17 @@ contract MultiSignPaymentWallet {
         emit ProductUpdated(productId, newName, newPrice);
     }
 
-    // Modificar status
     function setProductActive(uint productId, bool _active) external onlyAdmin {
         Product storage p = products[productId];
         p.active = _active;
         emit ProductStatusChanged(productId, _active);
     }
 
-    // Listar productos
     function getAllProducts() external view returns (Product[] memory all) {
         all = new Product[](nextProductId);
         for (uint i = 0; i < nextProductId; i++) all[i] = products[i];
     }
 
-    // Mostrar balance
     function getBalance() external view returns (uint) {
         return address(this).balance;
     }
