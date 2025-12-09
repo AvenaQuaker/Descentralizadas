@@ -1,148 +1,136 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const walletController = require('../controllers/wallet.js');
-const { ethers } = require('ethers');
 
-router.post('/deposit', async (req, res) => {
+const {
+    getProducts,
+    addProduct,
+    buyProduct,
+    updateProductController,
+    deleteProductController,
+    getPurchasesByUser
+} = require("../controllers/wallet.js");
+
+const personalController = require("../controllers/personal.js");
+
+// ===============================
+// GET: Productos
+// ===============================
+router.get("/products", async (req, res) => {
     try {
-        const { amount, account } = req.body;
-        console.log(amount, account);
-        await walletController.deposit(amount, account);
-        res.json({ success: true, message: 'Deposit successful' });
-    } catch (error) {
-        console.error('Deposit error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        const list = await getProducts();
+        res.json({ success: true, products: list });
+    } catch (err) {
+        console.error("Error /products:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
-router.post('/submit', async (req, res) => {
-    try {
-        const { to, amount, account } = req.body;
-        const parsedAmount = ethers.utils.parseEther(amount.toString());
-        const receipt = await walletController.submitTransaction(to, parsedAmount, account);
-        res.json({ success: true, message: 'Transaction submitted', receipt });
-    } catch (error) {
-        console.error('Submit error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-router.post('/approve', async (req, res) => {
-    try {
-        const { transactionId, account } = req.body;
-        const receipt = await walletController.approveTransaction(transactionId, account);
-        res.json({ success: true, message: 'Transaction approved', receipt });
-    } catch (error) {
-        console.error('Approve error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
 
-
-
-});
-router.post('/execute', async (req, res) => {
+// ===============================
+// POST: Crear Producto
+// ===============================
+router.post("/products", async (req, res) => {
+    const { name, description, price, stock, imageUrl } = req.body;
     
+    const account = "0x1881520890eCD07b9a0CAc5E49fd34e5Dc8dA8f8"; // Admin
+
     try {
-        const { transactionId, account } = req.body;
-        const receipt = await walletController.executeTransaction(transactionId, account);
-        res.json({ success: true, message: 'Transaction executed', receipt });
-    } catch (error) {
-        console.error('Execute error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        const tx = await addProduct(name, description, price, stock, imageUrl, account);
+        res.json({ success: true, transaction: tx });
+    } catch (err) {
+        console.error("Error creating product:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
-router.post('/release', async (req, res) => {
-    try {
-        const { account } = req.body;
-        
+// ===============================
+// PUT: Actualizar producto
+// ===============================
+router.put("/products/:id", async (req, res) => {
+    const { id } = req.params;
+    const { name, description, price, stock, imageUrl, active } = req.body;
 
-        const receipt = await walletController.releasePayments(account);
-        res.json({ success: true, message: 'Payments released to all payees', receipt });
-    } catch (error) {
-        console.error('Release error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+    const account = "0x1881520890eCD07b9a0CAc5E49fd34e5Dc8dA8f8"; // Admin
 
-router.get('/transactions', async (req, res) => {
     try {
-        const transactions = await walletController.getTransactions();
-        res.json({ success: true, transactions });
-    } catch (error) {
-        console.error('Get transactions error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-router.get('/balance', async (req, res) => {
-    try {
-        const balance = await walletController.getBalance();
-        res.json({ success: true, balance });
-    } catch (error) {
-        console.error('Get balance error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-router.get('/pruebas', async (req, res) => {
-    try {
-        await walletController.pruebas();
-        res.json({ success: true, message: 'Pruebas executed' });
-    } catch (error) {
-        console.error('Pruebas error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        const result = await updateProductController(
+            id, name, description, price, stock, imageUrl, active, account
+        );
+
+        res.json({ success: true, message: "Producto actualizado" });
+
+    } catch (err) {
+        console.error("Error updating product:", err);
+        res.status(400).json({ error: err.message });
     }
 });
 
-router.post('/addProduct', async (req, res) => {
+// ===============================
+// DELETE: Borrar producto
+// ===============================
+router.delete("/products/:id", async (req, res) => {
+    const { id } = req.params;
+    const account = req.session?.user?.wallet;
+
     try {
-        const { name, price, account } = req.body;
-        const parsedPrice = ethers.utils.parseEther(price.toString());
-        const receipt = await walletController.addProduct(name, parsedPrice, account);
-        res.json({ success: true, message: 'Product added', receipt });
-    } catch (error) {
-        console.error('Add product error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        const tx = await deleteProductController(id, account);
+        res.json({ success: true, transaction: tx });
+    } catch (err) {
+        console.error("Error deleting product:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
-router.post('/buyProduct', async (req, res) => {
+// ===============================
+// POST: Comprar producto + Registrar compra en PersonalManager
+// ===============================
+router.post("/buy/:productId", async (req, res) => {
+
+    const { productId } = req.params;
+    const account = req.session?.user?.wallet;
+
+    if (!account)
+        return res.status(401).json({ success: false, error: "Debes iniciar sesión" });
+
     try {
-        const { productId, account } = req.body;
-        const receipt = await walletController.buyProduct(productId, account);
-        res.json({ success: true, message: 'Product bought', receipt });
-    } catch (error) {
-        console.error('Buy product error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        // 1. Comprar producto en MultiSignPaymentWallet
+        const tx = await buyProduct(productId, account);
+
+        // 2. Registrar compra en PersonalManager
+        await personalController.registerPurchase(
+            account,
+            Number(tx.blockNumber),   // o nextPurchaseId si lo quieres exacto
+            Number(productId),
+            tx.value ? tx.value : 0
+        );
+
+        return res.json({
+            success: true,
+            msg: "Compra realizada exitosamente",
+            txHash: tx.transactionHash
+        });
+
+    } catch (err) {
+        console.error("Error buying:", err);
+        return res.status(500).json({ success: false, error: err.message });
     }
 });
 
-router.post('/disableProduct', async (req, res) => {
-    try {
-        const { productId, account } = req.body;
-        const receipt = await walletController.disableProduct(productId, account);
-        res.json({ success: true, message: 'Product disabled', receipt });
-    } catch (error) {
-        console.error('Disable product error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+// ===============================
+// GET: Compras del usuario
+// ===============================
+router.get("/purchases", async (req, res) => {
+    const account = req.session?.user?.wallet;
 
-router.post('/updateProduct', async (req, res) => {
-    try {
-        const { productId, newName, newPrice, account } = req.body;
-        const result = await walletController.updateProduct(productId, newName, newPrice, account);
-        res.json(result);
-    } catch (error) {
-        console.error('Update product error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+    if (!account)
+        return res.status(401).json({ success: false, error: "Debes iniciar sesión" });
 
-router.get('/getProducts', async (req, res) => {
     try {
-        const products = await walletController.getProducts();
-        res.json({ success: true, products });
-    } catch (error) {
-        console.error('Get products error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        const list = await getPurchasesByUser(account);
+        res.json({ success: true, purchases: list });
+
+    } catch (err) {
+        console.error("Error get purchases:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

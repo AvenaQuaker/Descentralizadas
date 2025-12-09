@@ -1,54 +1,55 @@
-require('dotenv').config({ path: require('find-config')('.env') })
-const { ethers } = require("ethers")
-const contract = require("../artifacts/contracts/Personal.sol/PersonalManager.json")
-const { parseEthersError } = require("../utils/parseEthersError");
+require('dotenv').config({ path: require('find-config')('.env') });
+const contract = require("../artifacts/contracts/Personal.sol/PersonalManager.json");
 
 const {
     createTransaction,
     getContract
-} = require("../utils/contractHelper")
+} = require("../utils/contractHelper");
 
-const { PERSONAL_CONTRACT } = process.env
+const { PERSONAL_CONTRACT } = process.env;
 
 
-// --------- HELPERS ----------
+// --------- GET INSTANCE ----------
 function getInstance() {
-    return getContract(PERSONAL_CONTRACT, contract.abi)
+    return getContract(PERSONAL_CONTRACT, contract.abi);
 }
 
+
+// --------- SEND TRANSACTION ----------
 async function send(method, params, account) {
-    return await createTransaction(PERSONAL_CONTRACT, contract.abi, method, params, account)
+    return await createTransaction(PERSONAL_CONTRACT, contract.abi, method, params, account);
 }
 
 
-// --------- CREATE PERSON ----------
-async function createPerson(data, account) {
-    try {
-        const { email, password, username, role, imageUrl, salary, wallet } = data
 
-        await send("createPerson", [
-            email,
-            password,
-            username,
-            role,
-            imageUrl,
-            salary,
-            wallet
-        ], account)
+// ======================================================
+// ===============  CREATE PERSON  ======================
+// ======================================================
+
+async function autoRegisterCustomer(wallet, account) {
+    try {
+        const result = await send("autoRegisterCustomer", [wallet], account);
 
         return {
             success: true,
-            message: "Person created successfully",
-            created: { email, username, role, wallet }
-        }
+            message: "Cliente Registrado Automaticamente",
+            data: result
+        };
 
     } catch (err) {
-        return { success: false, message: parseEthersError(err) }
+        return {
+            success: false,
+            message: err.toString()
+        };
     }
 }
 
 
-// --------- LOGIN POR WALLET (SIN PASSWORD) ----------
+
+// ======================================================
+// ===============  LOGIN WEB3  =========================
+// ======================================================
+
 async function loginWithWallet(wallet) {
     const instance = getInstance()
 
@@ -66,7 +67,8 @@ async function loginWithWallet(wallet) {
                 imageUrl: data.imageUrl,
                 salary: data.salary.toString(),
                 active: data.active,
-                wallet: wallet
+                wallet: wallet,
+                productos: data.productosComprados?.map(n => n.toString()) || []
             }
         }
 
@@ -80,67 +82,26 @@ async function loginWithWallet(wallet) {
 }
 
 
-// ---------- GET PERSON BY WALLET ----------
+
+// ======================================================
+// ===============  GET PERSON BY WALLET  ===============
+// ======================================================
+
 async function getPersonByWallet(wallet) {
-    return await loginWithWallet(wallet)
+    return await loginWithWallet(wallet);
 }
 
 
-// --------- UPDATE ROLE ----------
-async function updateRole(id, newRole, account) {
-    try {
-        await send("updateRole", [id, newRole], account)
 
-        return {
-            success: true,
-            message: "Role updated successfully",
-            updated: { id, newRole }
-        }
+// ======================================================
+// ===============  UPDATE  ========================
+// ======================================================
 
-    } catch (err) {
-        return { success: false, message: parseEthersError(err) }
-    }
-}
-
-
-// --------- UPDATE SALARY ----------
-async function updateSalary(id, newSalary, account) {
-    try {
-        await send("updateSalary", [id, newSalary], account)
-
-        return {
-            success: true,
-            message: "Salary updated successfully",
-            updated: { id, newSalary }
-        }
-
-    } catch (err) {
-        return { success: false, message: parseEthersError(err) }
-    }
-}
-
-
-// --------- SET ACTIVE ----------
-async function setActive(id, active, account) {
-    try {
-        await send("setActive", [id, active], account)
-
-        return {
-            success: true,
-            message: "User status updated",
-            updated: { id, active }
-        }
-
-    } catch (err) {
-        return { success: false, message: parseEthersError(err) }
-    }
-}
-
-
-// --------- UPDATE BASIC ----------
 async function updateBasicData(id, email, username, imageUrl, account) {
+    active =true;
+
     try {
-        await send("updateBasicData", [id, email, username, imageUrl], account)
+        await send("updateUser", [id, email, username, imageUrl, active], account)
 
         return {
             success: true,
@@ -149,48 +110,89 @@ async function updateBasicData(id, email, username, imageUrl, account) {
         }
 
     } catch (err) {
-        return { success: false, message: parseEthersError(err) }
+        return { success: false, message: err.message }
     }
 }
 
 
-// --------- GET ALL PERSONS ----------
-async function getAllPersons() {
+async function updateRole(id, newRole, account) {
     try {
-        const instance = getInstance()
-        const list = await instance.getAllPersons()
-
-        const formatted = list
-            .filter(p => p.id.toString() !== "0")
-            .map(p => ({
-                id: p.id.toString(),
-                email: p.email,
-                username: p.username,
-                role: p.role,
-                salary: p.salary.toString(),
-                imageUrl: p.imageUrl,
-                active: p.active,
-                wallet: p.wallet
-            }))
+        await send("updateRole", [id, newRole], account);
 
         return {
             success: true,
-            persons: formatted
-        }
+            message: "Role updated successfully",
+            updated: { id, newRole }
+        };
 
     } catch (err) {
-        return { success: false, message: parseEthersError(err) }
+        return { success: false, message: err.toString() };
     }
 }
 
 
+
+// ======================================================
+// ===============  GET ALL PERSONS  ====================
+// ======================================================
+
+async function getAllPersons() {
+    try {
+        const instance = getInstance();
+
+        const persons = await instance.getAllPersons();
+
+        // Muy importante: convertir array de structs a objetos JS normales
+        const list = persons.map(p => ({
+            id: p.id.toString(),
+            email: p.email,
+            username: p.username,
+            imageUrl: p.imageUrl,
+            role: p.role.toString(),
+            salary: p.salary.toString(),
+            active: p.active,
+            wallet: p.wallet
+        }));
+
+        return {
+            success: true,
+            persons: list
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            message: error.toString()
+        };
+    }
+}
+
+async function getPurchasesByPerson(personId) {
+    try {
+        const instance = getInstance();
+        const list = await instance.getPurchasesByPerson(personId);
+
+        return list.map(p => ({
+            purchaseId: p.purchaseId.toString(),
+            productId: p.productId.toString(),
+            timestamp: p.timestamp.toString(),
+            amountPaid: p.amountPaid.toString()
+        }));
+    } catch (err) {
+        console.error("Error getPurchasesByPerson:", err);
+        return [];
+    }
+}
+
+
+// ======================================================
+
 module.exports = {
-    createPerson,
+    autoRegisterCustomer,
     loginWithWallet,
     getPersonByWallet,
     updateRole,
-    updateSalary,
-    setActive,
+    getAllPersons,
     updateBasicData,
-    getAllPersons
-}
+    getPurchasesByPerson
+};

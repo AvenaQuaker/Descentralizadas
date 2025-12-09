@@ -1,269 +1,200 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.25;
 
 contract MultiSignPaymentWallet {
-
-    // ------------------------------- MULTISIGN ------------------------------------ 
-    address[] public owners;
-    uint public requiredApprovals;
-    mapping(address => bool) public isOwner;
-
-    struct Transaction {
-        uint id;
-        address to;
-        uint amount;
-        uint approvalCount;
-        bool executed;
-        bytes32 txHash;
+    enum Role {
+        None,
+        Admin,
+        Seller,
+        Customer
     }
 
-    Transaction[] public transactions;
-    uint public nextTransactionId;
-    mapping(uint => mapping(address => bool)) public approvals;
-
-    address[] public payees;
-    mapping(address => uint) public shares;
-    uint256 public totalShares;
-
-    uint private _status;
-    modifier nonReentrant() {
-        require(_status != 2, "Reentrancy Guard: Reentrant");
-        _status = 2;
-        _;
-        _status = 1;
-    }
-
-    // --------------------------------- EVENTOS CONTRATOS  ---------------------------------- 
-    event ContractDeployed(address indexed contractAddress, address[] owners, address[] payees, uint256[] shares, uint requiredApprovals);
-    event Deposit(address indexed sender, uint amount);
-    event TransactionSubmitted(uint indexed txId, address indexed to, uint amount);
-    event TransactionApproved(uint indexed txId, address indexed owner);
-    event TransactionExecuted(uint indexed txId, address indexed to, uint amount, bytes32 txHash);
-    event PaymentReleased(address indexed to, uint amount);
-
-    // --------------------------------- EVENTOS PRODUCTOS ---------------------------------
-    event ProductAdded(uint indexed productId, string name, uint price, uint stock, address seller);
-    event ProductUpdated(uint indexed productId, string name, uint price);
-    event ProductStatusChanged(uint indexed productId, bool active);
-    event ProductPurchased(uint indexed productId, address buyer, uint price);
-    event ProductPaymentQueued(uint indexed productId, uint indexed txId, uint amount);
-    event StockAdded(uint indexed productId, uint amount, uint newStock);
-
-    // NUEVOS EVENTOS
-    event SellerEarned(address indexed seller, uint amount);
-    event ProductBoughtByUser(address indexed buyer, uint indexed productId);
-
-    // ---------------------------------- ROLES -------------------------------------
-    enum Role { Customer, Seller, Admin }
-    mapping(address => Role) public roles;
-
-    modifier onlyAdmin() {
-        require(roles[msg.sender] == Role.Admin, "Only admin");
-        _;
-    }
-
-    modifier onlySellerOrAdmin() {
-        require(
-            roles[msg.sender] == Role.Seller ||
-            roles[msg.sender] == Role.Admin,
-            "Only seller or admin"
-        );
-        _;
-    }
-
-    modifier onlyOwner() {
-        require(isOwner[msg.sender], "Not an owner");
-        _;
-    }
-
-    // -------------------------------- CONSTRUCTOR ---------------------------------
-    constructor(
-        address[] memory _owners,
-        uint _requiredApprovals,
-        address[] memory _payees,
-        uint256[] memory _shares
-    ) {
-        _status = 1;
-        nextTransactionId = 0;
-
-        require(_owners.length > 0, "Owners required");
-        require(_requiredApprovals > 0 && _requiredApprovals <= _owners.length);
-        require(_payees.length == _shares.length, "Payees mismatch");
-
-        for (uint i = 0; i < _owners.length; i++) {
-            address owner = _owners[i];
-            require(owner != address(0), "Invalid owner");
-            require(!isOwner[owner], "Owner not unique");
-
-            isOwner[owner] = true;
-            owners.push(owner);
-
-            roles[owner] = Role.Admin;
-        }
-
-        for (uint i = 0; i < _payees.length; i++) {
-            address payee = _payees[i];
-            uint256 share = _shares[i];
-            require(payee != address(0), "Invalid payee");
-            require(share > 0, "Invalid share");
-            require(shares[payee] == 0, "Payee exists");
-
-            payees.push(payee);
-            shares[payee] = share;
-            totalShares += share;
-        }
-
-        requiredApprovals = _requiredApprovals;
-
-        emit ContractDeployed(address(this), _owners, _payees, _shares, _requiredApprovals);
-    }
-
-    // ------------------------------ TRANSACCIONES ----------------------------------
-    function deposit() external payable {
-        require(msg.value > 0);
-        emit Deposit(msg.sender, msg.value);
-    }
-
-    function submitTransaction(address _to, uint _amount) external onlyOwner {
-        require(_to != address(0));
-        require(_amount > 0);
-
-        uint txId = nextTransactionId++;
-        bytes32 txHash = keccak256(abi.encodePacked(block.timestamp, _to, _amount, txId));
-
-        transactions.push(Transaction(txId, _to, _amount, 0, false, txHash));
-        emit TransactionSubmitted(txId, _to, _amount);
-    }
-
-    function approveTransaction(uint txId) external onlyOwner {
-        Transaction storage t = transactions[txId];
-        require(!t.executed, "Executed");
-        require(!approvals[txId][msg.sender], "Approved");
-
-        approvals[txId][msg.sender] = true;
-        t.approvalCount++;
-
-        emit TransactionApproved(txId, msg.sender);
-    }
-
-    function executeTransaction(uint txId) external onlyOwner nonReentrant {
-        Transaction storage t = transactions[txId];
-        require(t.approvalCount >= requiredApprovals);
-        require(!t.executed);
-        require(address(this).balance >= t.amount);
-
-        t.executed = true;
-        (bool success,) = t.to.call{value: t.amount}("");
-        require(success);
-
-        emit TransactionExecuted(txId, t.to, t.amount, t.txHash);
-    }
-
-    // ------------------------------- PRODUCTOS ---------------------------------
     struct Product {
-        uint id;
+        uint256 id;
         string name;
-        uint price;
-        uint stock;
-        address seller;
+        string description;
+        uint256 price;
+        uint256 stock;
+        string imageUrl;
         bool active;
     }
 
-    uint public nextProductId;
-    mapping(uint => Product) public products;
-
-    // NUEVO: historial de compras
-    mapping(address => uint[]) public purchases;
-
-    function setSeller(address worker) external onlyAdmin {
-        roles[worker] = Role.Seller;
+    struct Purchase {
+        uint256 id;
+        uint256 productId;
+        address buyer;
+        uint256 amount;
+        uint256 timestamp;
     }
 
-    function addProduct(string memory _name, uint _price, uint _stock)
-        external
-        onlySellerOrAdmin
-    {
-        require(_price > 0, "Invalid price");
-        require(_stock > 0, "Invalid stock");
+    address public owner;
 
-        uint productId = nextProductId++;
+    mapping(address => Role) public roles;
+    mapping(uint256 => Product) public products;
+    mapping(uint256 => Purchase) public purchases;
 
-        products[productId] = Product({
-            id: productId,
-            name: _name,
-            price: _price,
-            stock: _stock,
-            seller: msg.sender,
-            active: true
-        });
+    uint256 public nextProductId = 1;
+    uint256 public nextPurchaseId = 1;
 
-        emit ProductAdded(productId, _name, _price, _stock, msg.sender);
+    event ProductCreated(uint256 id);
+    event ProductPurchased(uint256 id, address buyer);
+    event ProductUpdated(uint256 id);
+    event ProductDeleted(uint256 id);
+
+    modifier onlyAdmin() {
+        require(roles[msg.sender] == Role.Admin, "Not admin");
+        _;
     }
 
-    function addStock(uint productId, uint amount) external onlySellerOrAdmin {
-        Product storage p = products[productId];
-        require(p.active, "Inactive");
-        require(amount > 0, "Invalid amount");
-        require(msg.sender == p.seller || roles[msg.sender] == Role.Admin, "Not seller");
-
-        p.stock += amount;
-
-        emit StockAdded(productId, amount, p.stock);
+    modifier onlySeller() {
+        require(
+            roles[msg.sender] == Role.Admin ||
+                roles[msg.sender] == Role.Seller,
+            "Not seller"
+        );
+        _;
     }
 
-    function buyProduct(uint productId) external payable nonReentrant {
-        Product storage p = products[productId];
-        require(p.active, "Inactive");
-        require(p.stock > 0, "Out of stock");
-        require(msg.value == p.price, "Incorrect price");
+    constructor() {
+        owner = msg.sender;
+        roles[msg.sender] = Role.Admin;
+    }
 
-        p.stock -= 1;
+    // -------------------------------
+    // ROLES
+    // -------------------------------
+    function setRole(address _wallet, Role _role) external onlyAdmin {
+        roles[_wallet] = _role;
+    }
 
-        emit ProductPurchased(productId, msg.sender, msg.value);
+    // -------------------------------
+    // PRODUCTOS
+    // -------------------------------
+    function createProduct(
+        string memory _name,
+        string memory _description,
+        uint256 _price,
+        uint256 _stock,
+        string memory _imageUrl
+    ) external onlySeller returns (uint256) {
+        require(_price > 0, "Price must be > 0");
 
-        // -------- NUEVO: registrar compra del usuario --------
-        purchases[msg.sender].push(productId);
-        emit ProductBoughtByUser(msg.sender, productId);
-
-        // -------- NUEVO: registrar ganancia virtual del seller --------
-        emit SellerEarned(p.seller, msg.value);
-
-        // -------- crear transacción multisig --------
-        uint txId = nextTransactionId++;
-        bytes32 txHash = keccak256(
-            abi.encodePacked(block.timestamp, p.seller, msg.value, txId)
+        products[nextProductId] = Product(
+            nextProductId,
+            _name,
+            _description,
+            _price,
+            _stock,
+            _imageUrl,
+            true
         );
 
-        transactions.push(Transaction(txId, p.seller, msg.value, 0, false, txHash));
-
-        emit TransactionSubmitted(txId, p.seller, msg.value);
-        emit ProductPaymentQueued(productId, txId, msg.value);
+        emit ProductCreated(nextProductId);
+        nextProductId++;
+        return nextProductId - 1;
     }
 
-    function updateProduct(uint productId, string memory newName, uint newPrice)
-        external
-        onlyAdmin
-    {
-        require(newPrice > 0);
-        Product storage p = products[productId];
-        p.name = newName;
-        p.price = newPrice;
+    function updateProduct(
+        uint256 _id,
+        string memory _name,
+        string memory _description,
+        uint256 _price,
+        uint256 _stock,
+        string memory _imageUrl,
+        bool _active
+    ) external onlySeller {
+        require(products[_id].id != 0, "Not found");
 
-        emit ProductUpdated(productId, newName, newPrice);
-    }
-
-    function setProductActive(uint productId, bool _active) external onlyAdmin {
-        Product storage p = products[productId];
+        Product storage p = products[_id];
+        p.name = _name;
+        p.description = _description;
+        p.price = _price;
+        p.stock = _stock;
+        p.imageUrl = _imageUrl;
         p.active = _active;
-        emit ProductStatusChanged(productId, _active);
+
+        emit ProductUpdated(_id);
     }
 
-    function getAllProducts() external view returns (Product[] memory all) {
-        all = new Product[](nextProductId);
-        for (uint i = 0; i < nextProductId; i++) all[i] = products[i];
+    function deleteProduct(uint256 _id) external onlySeller {
+        require(products[_id].id != 0, "Not found");
+        delete products[_id];
+        emit ProductDeleted(_id);
     }
 
-    function getBalance() external view returns (uint) {
-        return address(this).balance;
+    // -------------------------------
+    // COMPRAS
+    // -------------------------------
+    function buyProduct(uint256 _productId) external payable {
+        Product storage p = products[_productId];
+
+        require(p.id != 0, "Product not found");
+        require(p.active, "Product inactive");
+        require(p.stock > 0, "Out of stock");
+        require(msg.value == p.price, "Incorrect amount");
+
+        // Reducir stock
+        p.stock--;
+        if (p.stock == 0) {
+            p.active = false;
+}
+
+        // Registrar compra
+        purchases[nextPurchaseId] = Purchase(
+            nextPurchaseId,
+            _productId,
+            msg.sender,
+            msg.value,
+            block.timestamp
+        );
+
+        emit ProductPurchased(_productId, msg.sender);
+
+        nextPurchaseId++;
     }
+
+    function getProducts() external view returns (Product[] memory) {
+        Product[] memory list = new Product[](nextProductId - 1);
+
+        for (uint256 i = 1; i < nextProductId; i++) {
+            list[i - 1] = products[i];
+        }
+
+        return list;
+    }
+
+    function getPurchasesByUser(address _wallet)
+        external
+        view
+        returns (Purchase[] memory)
+    {
+        uint256 count;
+
+        for (uint256 i = 1; i < nextPurchaseId; i++) {
+            if (purchases[i].buyer == _wallet) {
+                count++;
+            }
+        }
+
+        Purchase[] memory list = new Purchase[](count);
+        uint256 idx = 0;
+
+        for (uint256 i = 1; i < nextPurchaseId; i++) {
+            if (purchases[i].buyer == _wallet) {
+                list[idx] = purchases[i];
+                idx++;
+            }
+        }
+
+        return list;
+    }
+
+    function withdraw(address payable to, uint256 amount) external onlyAdmin {
+    require(to != address(0), "Invalid address");
+    require(address(this).balance >= amount, "Insufficient balance");
+
+    (bool success, ) = to.call{value: amount}("");
+    require(success, "Transfer failed");
+}
+
 }

@@ -43,7 +43,7 @@
                             overflow-hidden transition transform hover:scale-105 flex flex-col">
 
                     <!-- "Carátula" de película -->
-                    <div class="h-48 bg-black flex items-center justify-center">
+                    <div class="h-48 bg-center bg-cover flex items-center justify-center" style="background-image: url('<%= p.imageUrl %>');">
                         <span class="text-yellow-400 text-xl font-bold blockbuster-title text-center px-2">
                             <%= p.name %>
                         </span>

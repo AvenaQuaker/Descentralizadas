@@ -1,6 +1,6 @@
 const express = require("express")
 const router = express.Router()
-const personalController = require("../controllers/personal")
+const personalController = require("../controllers/personal.js")
 
 
 // ----------- CREATE ----------
@@ -92,6 +92,8 @@ router.post("/updateBasic", async (req, res) => {
 
 // ----------- GET ALL ----------
 router.get("/getAll", async (req, res) => {
+    console.log("entro")
+
     try {
         const persons = await personalController.getAllPersons()
         res.json({ success: true, persons })

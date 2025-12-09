@@ -19,78 +19,64 @@
                 action="/Auth/login"
                 method="post"
                 class="flex flex-col items-center justify-center gap-4 font-Montserrat">
-                    <input
-                    class="bg-gray-400/70 rounded p-2 px-3 text-center hover:bg-gray-300/90 transition-all"
-                        id="usuario"
-                        type="text"
-                        placeholder="Usuario"
-                        autocomplete="off"
-                        name="user"
-                        required />
-                    <input
-                        class="bg-gray-400/70 rounded p-2 px-3 text-center hover:bg-gray-300/90 transition-all"
-                        id="password"
-                        type="text"
-                        placeholder="Contrasena"
-                        name="password"
-                        autocomplete="off"
-                        required />
-                    
                 <button 
-                class="py-2 px-4 bg-red-900 text-gray-300 rounded font-Montserrat my-4 hover:scale-105 hover:bg-red-700 transition-all"
-                id="btnlogin" type="submit">
-                    Entrar
+                    class="py-2 px-4 bg-red-900 text-gray-300 rounded font-Montserrat my-4 hover:scale-105 hover:bg-red-700 transition-all"
+                    id="btnlogin" type="button">
+                    Conectar a MetaMask
                 </button>
             </form>
         </main>
     <script>
-    document.getElementById('form').addEventListener('submit', async (e) => {
-        e.preventDefault();
+document.getElementById('btnlogin').addEventListener('click', async () => {
+    if (!window.ethereum) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'MetaMask no detectado',
+            text: 'Instala MetaMask para continuar.',
+        });
+        return;
+    }
 
-        const user = document.getElementById('usuario').value.trim();
-        const password = document.getElementById('password').value.trim();
+    try {
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        const wallet = accounts[0];
 
-        try {
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usuario: user, password })
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet })
+        });
 
-            });
+        const data = await res.json();
 
-            const data = await res.json();
-
-            if (!res.ok || data.error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de acceso',
-                    text: data.error || 'Error en el inicio de sesión',
-                });
-                return;
-            }
-
-            Swal.fire({
-                icon: 'success',
-                title: 'Bienvenido',
-                text: data.message || 'Inicio de sesión exitoso',
-                timer: 1500,
-                showConfirmButton: false,
-            });
-
-            setTimeout(() => {
-                window.location.href = data.redirect
-            }, 1500);
-
-        } catch (err) {
-            console.error('Error fetch login:', err);
+        if (!res.ok || data.error) {
             Swal.fire({
                 icon: 'error',
-                title: 'Error',
-                text: 'Error de conexión con el servidor.',
+                title: 'Acceso denegado',
+                text: data.error,
             });
+            return;
         }
-    });
-    </script>
 
+        Swal.fire({
+            icon: 'success',
+            title: 'Bienvenido',
+            text: 'Accediendo...',
+            timer: 1500,
+            showConfirmButton: false,
+        });
+
+        setTimeout(() => window.location.href = data.redirect, 1500);
+
+    } catch (e) {
+        console.error(e);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Hubo un problema conectando MetaMask.',
+        });
+    }
+});
+    </script>
     </body>
 </html>

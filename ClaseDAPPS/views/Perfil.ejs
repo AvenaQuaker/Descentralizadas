@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Perfil</title>
+    <link rel="stylesheet" href="/css/perfilTW.css">
+    <script src="/sweetalert2/sweetalert2.all.js"></script>
+</head>
+
+<body class="min-h-screen bg-center bg-cover bg-[url('/images/fondoBlock.jpg')]">
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div class="max-w-5xl mx-auto mt-10 p-6 bg-black/60 backdrop-blur-lg rounded-xl shadow-xl">
+
+        <!-- HEADER PERFIL -->
+        <div class="flex items-center gap-6 border-b border-yellow-400 pb-6">
+            
+            <!-- IMAGEN -->
+            <img 
+                src="<%= person.imageUrl || '/icons/User.svg' %>"
+                class="w-28 h-28 rounded-full border-4 border-yellow-400 object-cover"
+            >
+
+            <!-- DATOS -->
+            <div>
+                <h1 class="text-3xl font-extrabold text-yellow-400">
+                    <%= person.username || 'Usuario sin nombre' %>
+                </h1>
+
+                <p class="text-gray-300 mt-1">
+                    <span class="font-semibold">Email:</span> <%= person.email || 'No definido' %>
+                </p>
+
+                <p class="text-gray-300 mt-1">
+                    <span class="font-semibold">Wallet:</span> <%= person.wallet %>
+                </p>
+
+                <p class="text-green-400 text-lg mt-2 font-semibold">
+                    Saldo: <%= saldo %> ETH
+                </p>
+            </div>
+
+            <!-- EDITAR -->
+            <button id="editProfileBtn"class="ml-auto bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-5 py-2 rounded-lg">
+                Editar perfil
+            </button>
+
+        </div>
+
+        <!-- SECCIÓN MIS PELÍCULAS -->
+        <h2 class="text-2xl font-bold text-yellow-400 mt-8">🎬 Mis Películas</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
+
+            <% if (movies.length === 0) { %>
+                <p class="text-gray-300 col-span-3 text-center text-lg">
+                    Aún no has comprado nada 😢
+                </p>
+            <% } %>
+
+            <% movies.forEach(movie => { %>
+
+                <div class="bg-blue-900 border-2 border-yellow-400 rounded-xl overflow-hidden shadow-xl">
+                    
+                    <img src="<%= movie.imageUrl %>" class="h-48 w-full object-cover">
+
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-yellow-400"><%= movie.name %></h3>
+
+                        <p class="text-gray-300 text-sm mt-2">
+                            Precio: <span class="text-green-400"><%= movie.price %> ETH</span>
+                        </p>
+
+                        <p class="text-gray-400 text-xs mt-1">
+                            Comprado el: <%= new Date(movie.timestamp * 1000).toLocaleString() %>
+                        </p>
+                    </div>
+
+                </div>
+
+            <% }) %>
+
+        </div>
+
+    </div>
+<script>
+document.getElementById("editProfileBtn").addEventListener("click", async () => {
+
+    const { value: formValues } = await Swal.fire({
+        title: "Editar Perfil",
+        background: "#111",
+        color: "#fff",
+        html: `
+            <input id="swal-username" placeholder="Nombre de usuario" class="swal2-input" value="<%= person.username %>">
+            <input id="swal-email" placeholder="Correo electrónico" class="swal2-input" value="<%= person.email %>">
+            <input id="swal-image" placeholder="URL de imagen" class="swal2-input" value="<%= person.imageUrl %>">
+        `,
+        confirmButtonText: "Guardar",
+        confirmButtonColor: "#facc15",
+        showCancelButton: true,
+        cancelButtonText: "Cancelar",
+        focusConfirm: false,
+
+        preConfirm: () => {
+            const username = document.getElementById("swal-username").value.trim();
+            const email = document.getElementById("swal-email").value.trim();
+            const imageUrl = document.getElementById("swal-image").value.trim();
+
+            if (!username || !email) {
+                Swal.showValidationMessage("Nombre y correo son obligatorios");
+                return false;
+            }
+
+            return { username, email, imageUrl };
+        }
+    });
+
+    if (!formValues) return;
+
+    try {
+        Swal.fire({
+            title: "Guardando cambios...",
+            background: "#111",
+            color: "#fff",
+            didOpen: () => Swal.showLoading(),
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false
+        });
+
+        const res = await fetch("/api/personal/updateBasic", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                id: "<%= person.id %>",
+                email: formValues.email,
+                username: formValues.username,
+                imageUrl: formValues.imageUrl,
+                account: "<%= person.wallet %>"
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            return Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: data.message,
+                background: "#111",
+                color: "#fff"
+            });
+        }
+
+        Swal.fire({
+            icon: "success",
+            title: "Perfil actualizado",
+            background: "#111",
+            color: "#fff",
+            timer: 1500,
+            showConfirmButton: false
+        });
+
+        setTimeout(() => location.reload(), 1500);
+
+    } catch (err) {
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No se pudo conectar al servidor",
+            background: "#111",
+            color: "#fff"
+        });
+    }
+
+});
+</script>
+
+
+
+</body>
+</html>

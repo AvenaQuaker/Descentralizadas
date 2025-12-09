@@ -1,179 +1,189 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.25;
 
 contract PersonalManager {
+    enum Role {
+        None,
+        Admin,
+        Seller,
+        Customer
+    }
 
-    // ---------------------------------- ROLES -------------------------------------
-    enum Role { Customer, Seller, Admin }
-
-    // Datos del personal
     struct Person {
-        uint id;
+        uint256 id;
         string email;
-        bytes32 passwordHash;
         string username;
-        Role role;
         string imageUrl;
-        uint salary;
+        Role role;
+        uint256 salary;
         bool active;
         address wallet;
     }
 
-    uint public nextPersonId;
-    mapping(uint => Person) public persons;
-    mapping(address => uint) public walletToPersonId;
+    struct PurchaseRecord {
+        uint256 purchaseId; 
+        uint256 productId;
+        uint256 timestamp;
+        uint256 amountPaid;
+    }
 
-    address public owner;
+    // STORAGE
+    mapping(uint256 => Person) public persons;
+    mapping(address => uint256) public walletToPersonId;
+    mapping(uint256 => PurchaseRecord[]) public purchasesByPerson;
 
-    // Modificador de acceso para rol de admin
-    modifier onlyContractAdmin() {
-        require(
-            walletToPersonId[msg.sender] != 0 &&
-            persons[walletToPersonId[msg.sender]].role == Role.Admin,
-            "Only admin"
-        );
+    uint256 public nextPersonId;
+    uint256[] private personIds;   // <--- AGREGADO
+
+    // EVENTS
+    event PersonCreated(uint256 id, address wallet, Role role);
+    event PurchaseRegistered(uint256 personId, uint256 productId);
+
+    // MODIFIERS
+    modifier onlyAdmin() {
+        uint256 id = walletToPersonId[msg.sender];
+        require(id != 0, "Not registered");
+        require(persons[id].role == Role.Admin, "Not admin");
         _;
     }
 
-    // Crear el primer admin por default
-    constructor() {
-        owner = msg.sender;
+    modifier onlyExistingUser(address user) {
+        require(walletToPersonId[user] != 0, "User not registered");
+        _;
+    }
 
-        persons[1] = Person({
-            id: 1,
-            email: "admin@dapps.com",
-            passwordHash: keccak256(bytes("admin")),
+    // CONSTRUCTOR
+    constructor() {
+        nextPersonId = 1;
+
+        persons[nextPersonId] = Person({
+            id: nextPersonId,
+            email: "admin@system.com",
             username: "admin",
+            imageUrl: "",
             role: Role.Admin,
-            imageUrl: "img/admin.png",
-            salary: 500,
+            salary: 0,
             active: true,
             wallet: msg.sender
         });
 
-        walletToPersonId[msg.sender] = 1;
-        nextPersonId = 2;
+        walletToPersonId[msg.sender] = nextPersonId;
+        personIds.push(nextPersonId); // <--- AGREGADO
+
+        emit PersonCreated(nextPersonId, msg.sender, Role.Admin);
+        nextPersonId++;
     }
 
-    // -------------------------------- PERSONAL -------------------------------
-    // Crear personal
-    function createPerson(
-        string memory _email,
-        string memory _password,
-        string memory _username,
-        Role _role,
-        string memory _imageUrl,
-        uint _salary,
-        address _wallet
-    ) external onlyContractAdmin {
-
+    // AUTO-REGISTER CUSTOMER
+    function autoRegisterCustomer(address _wallet)
+        external
+        returns (uint256)
+    {
         require(_wallet != address(0), "Invalid wallet");
-        require(walletToPersonId[_wallet] == 0, "Wallet already registered");
+        require(walletToPersonId[_wallet] == 0, "Already registered");
 
-        uint personId = nextPersonId++;
+        persons[nextPersonId] = Person(
+            nextPersonId,
+            "",
+            "",
+            "",
+            Role.Customer,
+            0,
+            true,
+            _wallet
+        );
 
-        persons[personId] = Person({
-            id: personId,
-            email: _email,
-            passwordHash: keccak256(bytes(_password)),
-            username: _username,
-            role: _role,
-            imageUrl: _imageUrl,
-            salary: _salary,
-            active: true,
-            wallet: _wallet
-        });
+        walletToPersonId[_wallet] = nextPersonId;
+        personIds.push(nextPersonId); // <--- AGREGADO
 
-        walletToPersonId[_wallet] = personId;
+        emit PersonCreated(nextPersonId, _wallet, Role.Customer);
+
+        nextPersonId++;
+        return nextPersonId - 1;
     }
 
-    // -------------------------------- LOGIN  --------------------------------
-    // Validacion de personal
-    function login(address _wallet, string memory _password)
-        external view returns (bool)
-    {
-        uint id = walletToPersonId[_wallet];
-        require(persons[id].active, "Inactive user");
+    // REGISTER PURCHASE
+    function registerPurchase(
+        address buyerWallet,
+        uint256 purchaseId,
+        uint256 productId,
+        uint256 amountPaid
+    ) external onlyExistingUser(buyerWallet) {
+        uint256 personId = walletToPersonId[buyerWallet];
 
-        return persons[id].passwordHash == keccak256(bytes(_password));
+        purchasesByPerson[personId].push(
+            PurchaseRecord({
+                purchaseId: purchaseId,
+                productId: productId,
+                timestamp: block.timestamp,
+                amountPaid: amountPaid
+            })
+        );
+
+        emit PurchaseRegistered(personId, productId);
     }
 
-    // -------------------------------- ROL O SALARIO --------------------------------
-    // Actualizar rol de un personal
-    function updateRole(uint _id, Role _newRole)
-        external onlyContractAdmin
+    // GET PURCHASES
+    function getPurchasesByPerson(uint256 personId)
+        external
+        view
+        returns (PurchaseRecord[] memory)
     {
-        require(_id < nextPersonId, "Invalid ID");
-        persons[_id].role = _newRole;
+        return purchasesByPerson[personId];
     }
 
-    // Actualizar salario de un personal
-    function updateSalary(uint _id, uint _newSalary)
-        external onlyContractAdmin
+    // GET PERSON BY WALLET
+    function getPersonByWallet(address _wallet)
+        external
+        view
+        returns (Person memory)
     {
-        require(_id < nextPersonId, "Invalid ID");
-        persons[_id].salary = _newSalary;
+        uint256 id = walletToPersonId[_wallet];
+        require(id != 0, "User not found");
+        return persons[id];
     }
 
-    // -------------------------------- ADMINISTRAR PERSONAL --------------------------------
-    // Modificar estatus
-    function setActive(uint _id, bool _active)
-        external onlyContractAdmin
-    {
-        require(_id < nextPersonId, "Invalid ID");
-        persons[_id].active = _active;
+    function exists(address _wallet) external view returns (bool) {
+        return walletToPersonId[_wallet] != 0;
     }
 
-    // Actualizar datos
-    function updateBasicData(uint _id, string memory _email, string memory _username, string memory _imageUrl) external onlyContractAdmin 
-    {
-        require(_id < nextPersonId, "Invalid ID");
-
-        persons[_id].email = _email;
-        persons[_id].username = _username;
-        persons[_id].imageUrl = _imageUrl;
+    function roleOf(address _wallet) external view returns (uint8) {
+        uint256 id = walletToPersonId[_wallet];
+        if (id == 0) return uint8(Role.None);
+        return uint8(persons[id].role);
     }
 
-    // Listar personal
-    function getAllPersons() 
-        external view 
-        returns (Person[] memory)
-    {
-        Person[] memory list = new Person[](nextPersonId);
+    // ADMIN UPDATE USER
+    function updateUser(
+        uint256 personId,
+        string memory email,
+        string memory username,
+        string memory imageUrl,
+        bool active
+    ) external onlyAdmin {
+        require(persons[personId].id != 0, "User not found");
 
-        for (uint i = 0; i < nextPersonId; i++) {
-            list[i] = persons[i];
+        Person storage p = persons[personId];
+        p.email = email;
+        p.username = username;
+        p.imageUrl = imageUrl;
+        p.active = active;
+    }
+
+    function setRole(uint256 personId, Role newRole) external onlyAdmin {
+        require(persons[personId].id != 0, "User not found");
+        persons[personId].role = newRole;
+    }
+
+    function getAllPersons() external view returns (Person[] memory) {
+        Person[] memory list = new Person[](personIds.length);
+
+        for (uint256 i = 0; i < personIds.length; i++) {
+            list[i] = persons[personIds[i]];
         }
 
         return list;
     }
 
-    // Obtener el usuario segun su wallet MetaMask
-    function getPersonByWallet(address _wallet)
-        external view
-        returns (
-            uint id,
-            string memory email,
-            string memory username,
-            Role role,
-            string memory imageUrl,
-            uint salary,
-            bool active
-        )
-    {
-        uint personId = walletToPersonId[_wallet];
-        require(personId != 0, "Person not found");
-
-        Person memory p = persons[personId];
-
-        return (
-            p.id,
-            p.email,
-            p.username,
-            p.role,
-            p.imageUrl,
-            p.salary,
-            p.active
-        );
-    }
+    
 }

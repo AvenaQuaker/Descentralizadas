@@ -1,31 +1,24 @@
-require('dotenv').config({path: require('find-config')('.env')})
-const { ethers } = require('ethers')
-const { API_URL, PUBLIC_KEYS, PRIVATE_KEYS } = process.env
+require('dotenv').config({ path: require('find-config')('.env') });
+const { ethers } = require('ethers');
 
-const publickeys =  PUBLIC_KEYS.split(',')
-const privatekeys = PRIVATE_KEYS.split(',')
-const provider = new ethers.providers.JsonRpcProvider(API_URL)
+const { API_URL, PRIVATE_KEY } = process.env;
 
-function getWallet(account) {
-    if(account >= publickeys.length) throw new Error(`Account ${account} not found`)
-    return new ethers.Wallet(privatekeys[account], provider)
+if (!API_URL) throw new Error("❌ Falta API_URL en el .env");
+if (!PRIVATE_KEY) throw new Error("❌ Falta PRIVATE_KEY en el .env");
+
+const provider = new ethers.providers.JsonRpcProvider(API_URL);
+const adminWallet = new ethers.Wallet(PRIVATE_KEY, provider);
+
+function getWallet() {
+    return adminWallet; 
 }
 
-function getPublicKey(account) {
-    if(account >= publickeys.length) throw new Error(`Account ${account} not found`)
-    return publickeys[account]
+function getPublicKey() {
+    return adminWallet.address;
 }
 
-function getALLAcounts() {
-    return publickeys.map((key, index) => ({
-        publicKey: key,
-        privateKey: privatekeys[index]
-    }))
-}
 module.exports = {
     provider,
     getWallet,
     getPublicKey,
-    getALLAcounts,
-    publickeys
-}
+};

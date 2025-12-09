@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import Routes from "./routes/Routes.js";
 import walletRoutes from "./routes/wallet.js";
 import pagosRoutes from "./routes/pagos.js";
-
+import personalRoutes from "./routes/personal.js"
 
 dotenv.config();
 
@@ -41,6 +41,7 @@ app.use(
 
 // Rutas
 app.use("/", Routes);
+app.use("/api/personal", personalRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/pagos", pagosRoutes);
 

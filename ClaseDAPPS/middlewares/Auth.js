@@ -1,8 +1,13 @@
-export function VerificarSesion(rol) {
+export function VerificarSesion(rolRequerido = null) {
     return (req, res, next) => {
-        if (!req.session.user || req.session.user.rol !== rol) {
+        if (!req.session.user) {
             return res.redirect("/");
         }
+
+        if (rolRequerido && req.session.user.rol !== rolRequerido) {
+            return res.status(403).send("Acceso denegado");
+        }
+
         next();
     };
 }
