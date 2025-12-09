@@ -8,45 +8,65 @@ const { WALLET_CONTRACT } = process.env
 router.get("/",  (req, res) => {
     res.render("Login");
 })
-router.get("/Admin", VerificarSesion("Admin"),async (req, res) => {
+
+router.post("/logout", (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            console.error("Error al cerrar sesión:", err);
+            return res.status(500).send("Error al cerrar sesión");
+        }
+        res.redirect("/");
+    });
+});
+
+router.get("/Admin", VerificarSesion("Admin"), async (req, res) => {
     try {
         const products = await walletController.getProducts();
+        const role = req.session.user.rol;
 
         res.render("cliente", {
             products,
-            walletContract: WALLET_CONTRACT 
+            role,
+            walletContract: WALLET_CONTRACT
         });
     } catch (err) {
-        console.error("Error al cargar /cliente:", err);
+        console.error("Error al cargar /Admin:", err);
         res.status(500).send("Error cargando la tienda");
     }
 });
-router.get("/Manager", VerificarSesion("Manager"),async (req, res) => {
+
+router.get("/Manager", VerificarSesion("Manager"), async (req, res) => {
     try {
         const products = await walletController.getProducts();
+        const role = req.session.user.rol;
 
         res.render("cliente", {
             products,
-            walletContract: WALLET_CONTRACT 
+            role,
+            walletContract: WALLET_CONTRACT
         });
     } catch (err) {
-        console.error("Error al cargar /cliente:", err);
+        console.error("Error al cargar /Manager:", err);
         res.status(500).send("Error cargando la tienda");
     }
 });
-router.get("/cliente", VerificarSesion("Cliente"), async (req, res) => {
+
+router.get("/Cliente", VerificarSesion("Cliente"), async (req, res) => {
     try {
         const products = await walletController.getProducts();
+        const role = req.session.user.rol;
 
         res.render("cliente", {
             products,
-            walletContract: WALLET_CONTRACT 
+            role,
+            walletContract: WALLET_CONTRACT
         });
     } catch (err) {
-        console.error("Error al cargar /cliente:", err);
+        console.error("Error al cargar /Cliente:", err);
         res.status(500).send("Error cargando la tienda");
     }
 });
+
 
 router.post("/login", async (req, res) => {
     const { wallet } = req.body;

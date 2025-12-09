@@ -16,6 +16,13 @@
             BLOCKBUSTER STORE
         </h1>
 
+    <form action="/logout" method="POST">
+        <button 
+            class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg shadow-md">
+            Cerrar sesión
+        </button>
+    </form>
+
         <form action="/Perfil" method="GET">
             <button 
                 class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg 
@@ -38,60 +45,59 @@
 
             <% products.forEach(p => { %>
 
-                <div class="bg-[#0032A0] rounded-xl border-4 border-yellow-400 shadow-2xl 
-                            overflow-hidden transition transform hover:scale-105 flex flex-col">
+                <div class="bg-blue-900 border-2 border-yellow-400 rounded-xl overflow-hidden shadow-xl">
 
-                    <!-- "Carátula" de película -->
-                    <div class="h-48 bg-center bg-cover flex items-center justify-center" style="background-image: url('<%= p.imageUrl %>');">
-                        <span class="text-yellow-400 text-xl font-bold blockbuster-title text-center px-2">
-                            <%= p.name %>
-                        </span>
-                    </div>
+    <img src="<%= p.imageUrl %>" class="h-48 w-full object-cover">
 
-                    <!-- CONTENIDO -->
-                    <div class="p-4 text-white flex flex-col flex-grow">
+    <div class="p-4">
+        <h3 class="text-xl font-bold text-yellow-400"><%= p.name %></h3>
 
-                        <h3 class="text-xl font-bold bb-yellow blockbuster-title">
-                            <%= p.name %>
-                        </h3>
+        <p class="text-gray-300 text-sm mt-2">
+            Precio: <span class="text-green-400"><%= p.price %> ETH</span>
+        </p>
 
-                        <p class="text-gray-200 mt-1 text-sm">
-                            Código de película: <%= p.id %>
-                        </p>
+        <% if (role === 'Admin') { %>
 
-                        <p class="text-yellow-300 font-bold mt-3 text-lg">
-                            <%= p.price %> ETH
-                        </p>
+            <!-- BOTÓN EDITAR (ADMIN) -->
+            <button 
+                class="mt-2 w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 rounded-lg"
+                onclick="editProduct('<%= p.id %>', '<%= p.name %>', '<%= p.description %>', '<%= p.price %>', '<%= p.stock %>', '<%= p.imageUrl %>')">
+                Editar
+            </button>
 
-                        <% if (!p.active) { %>
+            <!-- BOTÓN ELIMINAR (ADMIN) -->
+            <button 
+                class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg"
+                onclick="deleteProduct('<%= p.id %>')">
+                Eliminar
+            </button>
 
-                            <span class="mt-4 py-2 text-center bg-gray-300 text-gray-900 font-semibold rounded-lg">
-                                No disponible
-                            </span>
+        <% } else { %>
 
-                        <% } else { %>
+            <!-- BOTÓN RENTAR (CLIENTE) -->
+            <button class="mt-2 w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 rounded-lg"
+                onclick="buyMovie('<%= p.id %>', '<%= p.price %>')">
+                RENTAR AHORA
+            </button>
 
-                            <!-- BOTÓN AL ESTILO BLOCKBUSTER -->
-                            <form  class="mt-4">
-                                <input type="hidden" name="productId" value="<%= p.id %>">
+        <% } %>
 
-                                <button class="btn-rentar border-amber-500 bg-blue-500 p-3 rounded-2xl text-amber-50 font-Montserrat font-bold" type="button" 
-                                    onclick="buyMovie('<%= p.id %>', '<%= p.price %>')">
-                                    RENTAR AHORA
-                            </button>
-
-                            </form>
-
-                        <% } %>
-
-                    </div>
-                </div>
+    </div>
+</div>
 
             <% }) %>
 
         </div>
 
     </div>
+
+<% if (role === 'Admin') { %>
+<button onclick="addProduct()"
+    class="fixed bottom-10 right-10 bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-5 py-4 rounded-full shadow-xl text-xl">
+    ➕
+</button>
+<% } %>
+
 <script>
 async function buyMovie(productId, priceInEth) {
     try {
@@ -166,6 +172,144 @@ async function buyMovie(productId, priceInEth) {
     } catch (err) {
         console.error(err);
         Swal.fire("Error", err.message || "No se pudo completar la compra.", "error");
+    }
+}
+
+async function editProduct(id, name, description, price, stock, imageUrl) {
+    
+    const { value: formValues } = await Swal.fire({
+        title: "Editar Producto",
+        background: "#111",
+        color: "#fff",
+        width: "600px",
+        html: `
+            <input id="prod-name" class="swal2-input" placeholder="Nombre" value="${name}">
+            <input id="prod-desc" class="swal2-input" placeholder="Descripción" value="${description}">
+            <input id="prod-price" class="swal2-input" placeholder="Precio (ETH)" value="${price}">
+            <input id="prod-stock" class="swal2-input" placeholder="Stock" value="${stock}">
+            <input id="prod-image" class="swal2-input" placeholder="URL Imagen" value="${imageUrl}">
+        `,
+        confirmButtonText: "Guardar cambios",
+        confirmButtonColor: "#facc15",
+        showCancelButton: true,
+        cancelButtonText: "Cancelar",
+        focusConfirm: false,
+        preConfirm: () => {
+            return {
+                name: document.getElementById("prod-name").value,
+                description: document.getElementById("prod-desc").value,
+                price: document.getElementById("prod-price").value,
+                stock: document.getElementById("prod-stock").value,
+                imageUrl: document.getElementById("prod-image").value
+            }
+        }
+    });
+
+    if (!formValues) return;
+
+    Swal.fire({
+        title: "Actualizando...",
+        background: "#111",
+        color: "#fff",
+        didOpen: () => Swal.showLoading(),
+        allowOutsideClick: false
+    });
+
+    const res = await fetch(`/api/wallet/products/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formValues)
+    });
+
+    const data = await res.json();
+    Swal.close();
+
+    if (!data.success) {
+        return Swal.fire("Error", data.error, "error");
+    }
+
+    Swal.fire({
+        icon: "success",
+        title: "Producto actualizado",
+        timer: 1500,
+        showConfirmButton: false
+    });
+
+    setTimeout(() => location.reload(), 1400);
+}
+
+async function addProduct() {
+    const { value: form } = await Swal.fire({
+        title: "Agregar Producto",
+        background: "#111",
+        color: "#fff",
+        html: `
+            <input id="new-name" class="swal2-input" placeholder="Nombre">
+            <input id="new-desc" class="swal2-input" placeholder="Descripción">
+            <input id="new-price" class="swal2-input" placeholder="Precio (ETH)">
+            <input id="new-stock" class="swal2-input" placeholder="Stock">
+            <input id="new-image" class="swal2-input" placeholder="URL Imagen">
+        `,
+        confirmButtonText: "Agregar",
+        confirmButtonColor: "#facc15",
+        showCancelButton: true,
+        cancelButtonText: "Cancelar",
+        preConfirm: () => ({
+            name: document.getElementById("new-name").value,
+            description: document.getElementById("new-desc").value,
+            price: document.getElementById("new-price").value,
+            stock: document.getElementById("new-stock").value,
+            imageUrl: document.getElementById("new-image").value
+        })
+    });
+
+    if (!form) return;
+
+    Swal.fire({ title: "Creando...", didOpen: () => Swal.showLoading() });
+
+    const res = await fetch("/api/wallet/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+    });
+
+    const data = await res.json();
+    Swal.close();
+
+    if (!data.success) {
+        return Swal.fire("Error", data.error, "error");
+    }
+
+    Swal.fire({
+        icon: "success",
+        title: "Producto agregado",
+        timer: 1500,
+        showConfirmButton: false
+    });
+
+    setTimeout(() => location.reload(), 1500);
+}
+
+async function deleteProduct(id) {
+    const confirm = await Swal.fire({
+        title: "¿Eliminar producto?",
+        text: "Esta acción no se puede deshacer",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Eliminar",
+        cancelButtonText: "Cancelar"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    const res = await fetch(`/api/wallet/products/${id}`, { method: "DELETE" });
+    const data = await res.json();
+
+    if (!data.success) {
+        Swal.fire("Error", data.error || "No se pudo eliminar", "error");
+    } else {
+        Swal.fire("Eliminado", "El producto fue eliminado", "success");
+        setTimeout(() => location.reload(), 1200);
     }
 }
 

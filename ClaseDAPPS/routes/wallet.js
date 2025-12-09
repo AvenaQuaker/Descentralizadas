@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {  getContract, createTransaction } = require("../utils/contractHelper.js");
 const contract = require("../artifacts/contracts/Wallet.sol/MultiSignPaymentWallet.json");
-const { WALLET_CONTRACT } = process.env;
+const { WALLET_CONTRACT,OWNER } = process.env;
 
 const {
     getProducts,
@@ -33,7 +33,7 @@ router.get("/products", async (req, res) => {
 router.post("/products", async (req, res) => {
     const { name, description, price, stock, imageUrl } = req.body;
     
-    const account = "0x1881520890eCD07b9a0CAc5E49fd34e5Dc8dA8f8"; // Admin
+    const account = OWNER;
 
     try {
         const tx = await addProduct(name, description, price, stock, imageUrl, account);
@@ -51,7 +51,7 @@ router.put("/products/:id", async (req, res) => {
     const { id } = req.params;
     const { name, description, price, stock, imageUrl, active } = req.body;
 
-    const account = "0x1881520890eCD07b9a0CAc5E49fd34e5Dc8dA8f8"; // Admin
+    const account = OWNER;
 
     try {
         const result = await updateProductController(
@@ -71,16 +71,27 @@ router.put("/products/:id", async (req, res) => {
 // ===============================
 router.delete("/products/:id", async (req, res) => {
     const { id } = req.params;
-    const account = req.session?.user?.wallet;
+    
+    const account = OWNER;
+
+    if (!account) {
+        return res.status(401).json({ success: false, error: "Not logged in" });
+    }
 
     try {
         const tx = await deleteProductController(id, account);
-        res.json({ success: true, transaction: tx });
+
+        return res.json({
+            success: true,
+            tx
+        });
+
     } catch (err) {
         console.error("Error deleting product:", err);
-        res.status(500).json({ success: false, error: err.message });
+        return res.status(500).json({ success: false, error: err.message });
     }
 });
+
 
 // ===============================
 // GET: Compras del usuario

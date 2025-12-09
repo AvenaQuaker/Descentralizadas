@@ -60,9 +60,18 @@ async function updateProductController(id, name, description, priceInEth, stock,
 }
 
 // Eliminar producto
-async function deleteProductController(id, account){
-  return await createTransaction("deleteProduct", [id], account);
+async function deleteProductController(productId, account) {
+    walletABI = contract.abi;
+
+    return await createTransaction(
+        WALLET_CONTRACT,    
+        walletABI,            
+        "deleteProduct",      
+        [productId],          
+        account               
+    );
 }
+
 
 // getPurchasesByUser
 async function getPurchasesByUser(walletAddress){
