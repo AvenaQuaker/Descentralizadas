@@ -41,6 +41,26 @@ router.get("/byWallet/:wallet", async (req, res) => {
     }
 })
 
+router.post("/registerPurchase", async (req, res) => {
+    try {
+        const { wallet, productId, amountPaid } = req.body;
+
+        const purchaseId = Date.now();
+
+        const result = await personalController.registerPurchase(
+            wallet,
+            purchaseId,
+            productId,
+            amountPaid
+        );
+
+        return res.json(result);
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 
 // ----------- UPDATE ROLE ----------
 router.post("/updateRole", async (req, res) => {

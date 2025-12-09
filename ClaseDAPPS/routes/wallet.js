@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
+const {  getContract, createTransaction } = require("../utils/contractHelper.js");
+const contract = require("../artifacts/contracts/Wallet.sol/MultiSignPaymentWallet.json");
+const { WALLET_CONTRACT } = process.env;
 
 const {
     getProducts,
     addProduct,
-    buyProduct,
     updateProductController,
     deleteProductController,
     getPurchasesByUser
@@ -77,41 +79,6 @@ router.delete("/products/:id", async (req, res) => {
     } catch (err) {
         console.error("Error deleting product:", err);
         res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-// ===============================
-// POST: Comprar producto + Registrar compra en PersonalManager
-// ===============================
-router.post("/buy/:productId", async (req, res) => {
-
-    const { productId } = req.params;
-    const account = req.session?.user?.wallet;
-
-    if (!account)
-        return res.status(401).json({ success: false, error: "Debes iniciar sesión" });
-
-    try {
-        // 1. Comprar producto en MultiSignPaymentWallet
-        const tx = await buyProduct(productId, account);
-
-        // 2. Registrar compra en PersonalManager
-        await personalController.registerPurchase(
-            account,
-            Number(tx.blockNumber),   // o nextPurchaseId si lo quieres exacto
-            Number(productId),
-            tx.value ? tx.value : 0
-        );
-
-        return res.json({
-            success: true,
-            msg: "Compra realizada exitosamente",
-            txHash: tx.transactionHash
-        });
-
-    } catch (err) {
-        console.error("Error buying:", err);
-        return res.status(500).json({ success: false, error: err.message });
     }
 });
 

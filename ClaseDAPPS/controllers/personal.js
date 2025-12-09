@@ -1,12 +1,13 @@
 require('dotenv').config({ path: require('find-config')('.env') });
 const contract = require("../artifacts/contracts/Personal.sol/PersonalManager.json");
+const { ethers } = require("ethers");
 
 const {
     createTransaction,
     getContract
 } = require("../utils/contractHelper");
 
-const { PERSONAL_CONTRACT } = process.env;
+const { PERSONAL_CONTRACT,WALLET_CONTRACT } = process.env;
 
 
 // --------- GET INSTANCE ----------
@@ -167,20 +168,35 @@ async function getAllPersons() {
     }
 }
 
-async function getPurchasesByPerson(personId) {
+async function getPurchases(wallet) {
+    const tienda = getContract(WALLET_CONTRACT, contract.abi)
+    return await tienda.getPurchasesByUser(wallet)
+}
+
+async function registerPurchase(wallet, purchaseId, productId, amountPaid) {
     try {
         const instance = getInstance();
-        const list = await instance.getPurchasesByPerson(personId);
 
-        return list.map(p => ({
-            purchaseId: p.purchaseId.toString(),
-            productId: p.productId.toString(),
-            timestamp: p.timestamp.toString(),
-            amountPaid: p.amountPaid.toString()
-        }));
+        // ABI del contrato PersonalManager
+        const personalManagerAbi = contract.abi;
+
+        // Convertir el monto a BigNumber
+        const parsedAmount = ethers.utils.parseEther(String(amountPaid));
+
+        // Crear la transacción firmada por el admin (índice 1)
+        const tx = await createTransaction(
+            PERSONAL_CONTRACT,
+            personalManagerAbi,
+            "registerPurchase",
+            [wallet, purchaseId, productId, parsedAmount],
+            1
+        );
+
+        return { success: true, txHash: tx.transactionHash };
+
     } catch (err) {
-        console.error("Error getPurchasesByPerson:", err);
-        return [];
+        console.error("REGISTER ERROR:", err);
+        return { success: false, message: err.toString() };
     }
 }
 
@@ -194,5 +210,6 @@ module.exports = {
     updateRole,
     getAllPersons,
     updateBasicData,
-    getPurchasesByPerson
+    getPurchases,
+    registerPurchase
 };

@@ -36,35 +36,6 @@ async function addProduct(name, description, price, stock, imageUrl, account) {
     );
 }
 
-
-// Comprar un producto desde la wallet del user (necesita que el backend tenga access a la key o el usuario firme en frontend).
-// Este ejemplo usa key/account (getWallet(account) -> Wallet signer) para firmar y enviar la tx.
-async function buyProduct(productId, account){
-  try {
-    const walletSigner = getWallet(account); // tu helper que retorna ethers.Wallet o provider.getSigner()
-    const tienda = getContract(WALLET_CONTRACT, contract.abi).connect(walletSigner);
-
-    // puedes leer el producto por la mapping pública:
-    const product = await tienda.products(productId); // ok porque mapping es public
-    if (!product || product.id.toString() === "0") throw new Error("Producto no encontrado");
-    if (!product.active) throw new Error("Producto no disponible");
-
-    // msg.value debe ser EXACTAMENTE product.price
-    const value = product.price; // BigNumber
-    const tx = await tienda.buyProduct(productId, { value: value.toString() });
-    const receipt = await tx.wait();
-
-    return {
-      success: true,
-      transactionHash: receipt.transactionHash,
-      blockNumber: receipt.blockNumber
-    };
-  } catch (error) {
-    console.error("buyProduct error:", error);
-    throw error;
-  }
-}
-
 async function updateProductController(id, name, description, priceInEth, stock, imageUrl, active, account) {
     try {
         const parsedPrice = ethers.utils.parseEther(priceInEth.toString())
@@ -120,7 +91,6 @@ async function getWalletBalance(walletAddress) {
 module.exports = {
   getProducts,
   addProduct,
-  buyProduct,
   updateProductController,
   deleteProductController,
   getPurchasesByUser,

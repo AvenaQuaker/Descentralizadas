@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <title>Tienda - Cliente</title>
     <link rel="stylesheet" href="/css/clienteTW.css">
+    <script src="/sweetalert2/sweetalert2.all.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="/js/walletAbi.js"></script>
 </head>
 <body class="min-h-screen bg-center bg-cover bg-[url('/images/fondoBlock.jpg')]" >
 
@@ -13,18 +16,14 @@
             BLOCKBUSTER STORE
         </h1>
 
-        <form action="/logout" method="POST">
+        <form action="/Perfil" method="GET">
             <button 
                 class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg 
                 font-semibold shadow-md transition">
-                Cerrar sesión
+                Perfil
             </button>
         </form>
 
-        <button id="loginMM"
-         class="bg-indigo-600 text-white px-4 py-2 rounded-lg">
-            Iniciar sesión con MetaMask
-        </button>
     </nav>
 
     <!-- CONTENEDOR PRINCIPAL -->
@@ -73,14 +72,14 @@
                         <% } else { %>
 
                             <!-- BOTÓN AL ESTILO BLOCKBUSTER -->
-                            <form action="/api/wallet/buyProduct" method="POST" class="mt-4">
+                            <form  class="mt-4">
                                 <input type="hidden" name="productId" value="<%= p.id %>">
 
-                                <button 
-                                    class="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-lg
-                                    hover:bg-yellow-300 transition uppercase shadow-md">
-                                    Rentar ahora
-                                </button>
+                                <button class="btn-rentar border-amber-500 bg-blue-500 p-3 rounded-2xl text-amber-50 font-Montserrat font-bold" type="button" 
+                                    onclick="buyMovie('<%= p.id %>', '<%= p.price %>')">
+                                    RENTAR AHORA
+                            </button>
+
                             </form>
 
                         <% } %>
@@ -94,31 +93,83 @@
 
     </div>
 <script>
-document.getElementById("loginMM").onclick = async () => {
-    if (!window.ethereum) {
-        return alert("MetaMask no está instalado");
-    }
-
+async function buyMovie(productId, priceInEth) {
     try {
-        const accounts = await ethereum.request({
-            method: "eth_requestAccounts"
+        if (!window.ethereum) {
+            return Swal.fire("Error", "Necesitas MetaMask instalado.", "error");
+        }
+
+        // 1) Conectar MetaMask
+        await ethereum.request({ method: "eth_requestAccounts" });
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer   = provider.getSigner();
+        const userWallet = await signer.getAddress();
+            console.log("Pagando desde:", userWallet)
+        // 2) Comprobar saldo
+        const balance = await provider.getBalance(userWallet);
+        const needed = ethers.utils.parseEther(String(priceInEth));
+
+        if (balance.lt(needed)) {
+            return Swal.fire({
+                icon: "error",
+                title: "Saldo insuficiente",
+                text: "Tu cuenta no tiene ETH para completar la compra."
+            });
+        }
+
+        // 3) Contrato de la tienda
+        const contractAddress = "<%= walletContract %>";  // lo pasas desde el render
+        const abi = window.WALLET_ABI;                    // cargado en un <script>
+
+        const contract = new ethers.Contract(contractAddress, abi, signer);
+
+        Swal.fire({
+            title: "Procesando compra...",
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
         });
 
-        const publicKey = accounts[0];
+        // 4) Comprar el producto *desde la wallet del usuario*
+        const tx = await contract.buyProduct(productId, {
+            value: ethers.utils.parseEther(String(priceInEth))
+        });
+        await tx.wait();
 
-        console.log(publicKey)
+        // 5) Registrar compra en tu backend / PersonalManager
+        const res = await fetch("/api/personal/registerPurchase", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                wallet: userWallet,
+                productId,
+                amountPaid: String(priceInEth)
+            })
+        });
 
         const data = await res.json();
+        Swal.close();
 
-        if (data.redirect) {
-            window.location.href = data.redirect;
+        if (!data.success) {
+            return Swal.fire("Error", data.message, "error");
         }
+
+        Swal.fire({
+            icon: "success",
+            title: "Compra realizada",
+            text: "La película ha sido añadida a tu perfil.",
+            timer: 1800,
+            showConfirmButton: false
+        });
+
+        setTimeout(() => location.href = "/perfil", 1600);
 
     } catch (err) {
         console.error(err);
-        alert("Error al conectar con MetaMask");
+        Swal.fire("Error", err.message || "No se pudo completar la compra.", "error");
     }
-};
+}
+
 </script>
+
 </body>
 </html>

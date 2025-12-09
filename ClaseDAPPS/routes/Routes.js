@@ -3,21 +3,49 @@ const router = express.Router();
 import { VerificarSesion } from "../middlewares/Auth.js";
 import walletController from "../controllers/wallet.js";
 import personalController from "../controllers/personal.js";
+const { WALLET_CONTRACT } = process.env
 
 router.get("/",  (req, res) => {
     res.render("Login");
 })
 router.get("/Admin", VerificarSesion("Admin"),async (req, res) => {
-    const products = await walletController.getProducts();
-    res.render("cliente",{products: products});
+    try {
+        const products = await walletController.getProducts();
+
+        res.render("cliente", {
+            products,
+            walletContract: WALLET_CONTRACT 
+        });
+    } catch (err) {
+        console.error("Error al cargar /cliente:", err);
+        res.status(500).send("Error cargando la tienda");
+    }
 });
 router.get("/Manager", VerificarSesion("Manager"),async (req, res) => {
-    const products = await walletController.getProducts();
-    res.render("cliente",{products: products});
+    try {
+        const products = await walletController.getProducts();
+
+        res.render("cliente", {
+            products,
+            walletContract: WALLET_CONTRACT 
+        });
+    } catch (err) {
+        console.error("Error al cargar /cliente:", err);
+        res.status(500).send("Error cargando la tienda");
+    }
 });
-router.get("/Cliente", VerificarSesion("Cliente"),async (req, res) => {
-    const products = await walletController.getProducts();
-    res.render("cliente",{products: products});
+router.get("/cliente", VerificarSesion("Cliente"), async (req, res) => {
+    try {
+        const products = await walletController.getProducts();
+
+        res.render("cliente", {
+            products,
+            walletContract: WALLET_CONTRACT 
+        });
+    } catch (err) {
+        console.error("Error al cargar /cliente:", err);
+        res.status(500).send("Error cargando la tienda");
+    }
 });
 
 router.post("/login", async (req, res) => {
@@ -68,32 +96,61 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/perfil", VerificarSesion(), async (req, res) => {
-    const wallet = req.session.user.wallet;
-    const personId = req.session.user.id;
+    try {
+        const wallet = req.session.user.wallet;
 
-    const personData = await personalController.getPersonByWallet(wallet);
-    const purchases = await personalController.getPurchasesByPerson(personId);
-    const allProducts = await walletController.getProducts();
+        // === 1. INFO DEL USUARIO ===
+        const personData = await personalController.getPersonByWallet(wallet);
 
-    const movies = purchases.map(p => {
-        const product = allProducts.find(prod => Number(prod.id) === Number(p.productId));
-        return {
-            id: product.id,
-            name: product.name,
-            imageUrl: product.imageUrl,
-            price: product.price,
-            timestamp: p.timestamp
-        };
-    });
+        if (!personData.success) {
+            return res.status(400).send("Usuario no encontrado en el contrato");
+        }
 
-    const saldo = await walletController.getWalletBalance(wallet);
+        // === 2. SALDO DEL USUARIO ===
+        const saldo = await walletController.getWalletBalance(wallet);
 
-    res.render("perfil", {
-        person: personData.person,
-        saldo,
-        movies
-    });
+        // === 3. COMPRAS DEL USUARIO (desde contrato de tienda) ===
+        const purchases = await walletController.getPurchasesByUser(wallet);
+
+        // === 4. PRODUCTOS DISPONIBLES ===
+        const allProducts = await walletController.getProducts();
+
+        // === 5. UNIR COMPRAS + PRODUCTOS ===
+        const movies = purchases.map(p => {
+            const product = allProducts.find(prod => Number(prod.id) === Number(p.productId));
+
+            if (!product) {
+                return {
+                    id: p.productId,
+                    name: "Producto eliminado",
+                    imageUrl: "https://via.placeholder.com/200?text=Producto+Eliminado",
+                    price: "0",
+                    timestamp: p.timestamp
+                };
+            }
+
+            return {
+                id: product.id,
+                name: product.name,
+                imageUrl: product.imageUrl,
+                price: product.price,
+                timestamp: p.timestamp
+            };
+        });
+
+        // === 6. RENDERIZAR PERFIL ===
+        res.render("perfil", {
+            person: personData.person,
+            saldo,
+            movies
+        });
+
+    } catch (err) {
+        console.error("Error en perfil:", err);
+        res.status(500).send("Error interno del servidor");
+    }
 });
+
 
 
 
