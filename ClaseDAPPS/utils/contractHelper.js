@@ -1,12 +1,11 @@
 const { ethers } = require("ethers")
-const { provider, getWallet, getPublicKey } = require("./accountManager")
+const { provider, getWallet } = require("./accountManager")
 
 async function createTransaction(contractAddress, abi, method, params, account) {
     try {
         const wallet = getWallet(account)
         const contract = new ethers.Contract(contractAddress, abi, wallet)
-        
-        // Llamada al metodo del contrato
+
         const tx = await contract[method](...params)
         const receipt = await tx.wait()
         

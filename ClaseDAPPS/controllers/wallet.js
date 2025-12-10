@@ -6,7 +6,7 @@ const { WALLET_CONTRACT } = process.env;
 
 async function getProducts(){
   const wallet = getContract(WALLET_CONTRACT, contract.abi);
-  const products = await wallet.getProducts();      // <-- coincide con tu contrato
+  const products = await wallet.getProducts();   
   if(!products || products.length === 0) return [];
   return products.map(formatProduct).filter(p => p.id !== "0");
 }
@@ -16,7 +16,7 @@ function formatProduct(info){
     id: info.id.toString(),
     name: info.name,
     description: info.description,
-    price: ethers.utils.formatEther(info.price), // retorna string en ETH legible
+    price: ethers.utils.formatEther(info.price), 
     stock: info.stock.toString(),
     imageUrl: info.imageUrl,
     active: info.active,
@@ -41,11 +41,11 @@ async function updateProductController(id, name, description, priceInEth, stock,
         const parsedPrice = ethers.utils.parseEther(priceInEth.toString())
 
         const receipt = await createTransaction(
-            WALLET_CONTRACT,      // <<< Dirección correcta
-            contract.abi,         // <<< ABI correcto
-            "updateProduct",      // <<< Nombre del método
+            WALLET_CONTRACT,     
+            contract.abi,        
+            "updateProduct",    
             [id, name, description, parsedPrice, stock, imageUrl, active],
-            account               // <<< Owner/seller
+            account           
         )
 
         return {
@@ -59,7 +59,6 @@ async function updateProductController(id, name, description, priceInEth, stock,
     }
 }
 
-// Eliminar producto
 async function deleteProductController(productId, account) {
     walletABI = contract.abi;
 
@@ -72,8 +71,6 @@ async function deleteProductController(productId, account) {
     );
 }
 
-
-// getPurchasesByUser
 async function getPurchasesByUser(walletAddress){
   const inst = getContract(WALLET_CONTRACT, contract.abi);
   const purchases = await inst.getPurchasesByUser(walletAddress);
@@ -96,6 +93,35 @@ async function getWalletBalance(walletAddress) {
     }
 }
 
+async function totalBalance() {
+    const balanceWei = await provider.getBalance(WALLET_CONTRACT)
+    return ethers.utils.formatEther(balanceWei) 
+}
+
+async function PagarAlOwner(amountEth) {
+    try {
+        const wallet = getWallet() 
+        const instance = new ethers.Contract(WALLET_CONTRACT, contract.abi, wallet)
+
+        const value = ethers.utils.parseEther(String(amountEth))
+
+        const tx = await instance.withdraw(wallet.address, value)
+        const receipt = await tx.wait()
+
+        console.log("Withdraw TX:", receipt.transactionHash)
+
+        return {
+            success: true,
+            txHash: receipt.transactionHash
+        }
+    } catch (err) {
+        console.error("Error en withdrawToOwner:", err)
+        return {
+            success: false,
+            message: err.message || err.toString()
+        }
+    }
+}
 
 module.exports = {
   getProducts,
@@ -103,5 +129,7 @@ module.exports = {
   updateProductController,
   deleteProductController,
   getPurchasesByUser,
-  getWalletBalance
+  getWalletBalance,
+  totalBalance,
+  PagarAlOwner
 }

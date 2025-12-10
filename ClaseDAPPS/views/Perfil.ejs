@@ -14,20 +14,14 @@
     class="inline-block bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-5 py-2 rounded-lg mt-6 mx-5">
         ← Volver a la Tienda
     </a>
-
-    <!-- CONTENEDOR PRINCIPAL -->
     <div class="max-w-5xl mx-auto mt-12 p-8 bg-black/60 backdrop-blur-xl rounded-xl shadow-2xl">
 
-        <!-- HEADER PERFIL -->
         <div class="flex items-center gap-8 border-b border-yellow-500 pb-6">
 
-            <!-- FOTO -->
             <img 
                 src="<%= person.imageUrl || '/icons/User.svg' %>"
                 class="w-32 h-32 rounded-full border-4 border-yellow-400 object-cover shadow-xl"
             >
-
-            <!-- DATOS -->
             <div class="flex flex-col gap-1">
                 <h1 class="text-4xl font-extrabold text-yellow-400 tracking-wide">
                     <%= person.username || 'Usuario sin nombre' %>
@@ -48,7 +42,6 @@
                 </p>
             </div>
 
-            <!-- EDITAR -->
             <button
                 id="editProfileBtn"
                 class="ml-auto bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all text-black font-bold px-6 py-3 rounded-lg shadow-md"
@@ -57,8 +50,6 @@
             </button>
 
         </div>
-
-        <!-- SECCIÓN MIS PELÍCULAS -->
         <h2 class="text-3xl font-bold text-yellow-400 mt-10 flex items-center gap-3">
             🎬 Mis Películas
         </h2>
@@ -73,7 +64,6 @@
 
             <% movies.forEach(movie => { %>
 
-            <!-- CARD DE PELÍCULA -->
             <div class="bg-blue-900/90 border-2 border-yellow-400 rounded-xl overflow-hidden shadow-xl hover:scale-[1.03] transition-transform">
 
                 <img src="<%= movie.imageUrl %>" class="h-56 w-full object-cover">
@@ -103,9 +93,6 @@
 
     </div>
 
-<!-- ==========================
-     SWEET ALERT EDITAR PERFIL
-=========================== -->
 <script>
 document.getElementById("editProfileBtn").addEventListener("click", async () => {
 

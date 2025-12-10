@@ -2,8 +2,6 @@ const express = require("express")
 const router = express.Router()
 const personalController = require("../controllers/personal.js")
 
-
-// ----------- CREATE ----------
 router.post("/create", async (req, res) => {
     try {
         const { account, data } = req.body
@@ -15,8 +13,6 @@ router.post("/create", async (req, res) => {
     }
 })
 
-
-// ----------- LOGIN POR WALLET PUBLICA ----------
 router.post("/loginWallet", async (req, res) => {
     try {
         const { wallet } = req.body
@@ -28,8 +24,6 @@ router.post("/loginWallet", async (req, res) => {
     }
 })
 
-
-// ----------- GET USER BY WALLET ----------
 router.get("/byWallet/:wallet", async (req, res) => {
     try {
         const wallet = req.params.wallet
@@ -61,8 +55,6 @@ router.post("/registerPurchase", async (req, res) => {
     }
 });
 
-
-// ----------- UPDATE ROLE ----------
 router.post("/updateRole", async (req, res) => {
     try {
         const { id, newRole, account } = req.body
@@ -73,8 +65,6 @@ router.post("/updateRole", async (req, res) => {
     }
 })
 
-
-// ----------- UPDATE SALARY ----------
 router.post("/updateSalary", async (req, res) => {
     try {
         const { id, newSalary, account } = req.body
@@ -85,8 +75,6 @@ router.post("/updateSalary", async (req, res) => {
     }
 })
 
-
-// ----------- SET ACTIVE ----------
 router.post("/setActive", async (req, res) => {
     try {
         const { id, active, account } = req.body
@@ -97,8 +85,6 @@ router.post("/setActive", async (req, res) => {
     }
 })
 
-
-// ----------- UPDATE BASIC DATA ----------
 router.post("/updateBasic", async (req, res) => {
     try {
         const { id, email, username, imageUrl, account } = req.body
@@ -109,8 +95,6 @@ router.post("/updateBasic", async (req, res) => {
     }
 })
 
-
-// ----------- GET ALL ----------
 router.get("/getAll", async (req, res) => {
     console.log("entro")
 

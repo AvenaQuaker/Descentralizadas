@@ -21,51 +21,52 @@ router.post("/logout", (req, res) => {
 
 router.get("/Admin", VerificarSesion("Admin"), async (req, res) => {
     try {
-        const products = await walletController.getProducts();
-        const role = req.session.user.rol;
+        const products = await walletController.getProducts()
+        const storeBalance = await walletController.totalBalance()
 
         res.render("cliente", {
             products,
-            role,
-            walletContract: WALLET_CONTRACT
-        });
+            walletContract: WALLET_CONTRACT,
+            role: "Admin",
+            storeBalance
+        })
     } catch (err) {
-        console.error("Error al cargar /Admin:", err);
-        res.status(500).send("Error cargando la tienda");
+        console.error("Error al cargar /Admin:", err)
+        res.status(500).send("Error cargando la tienda")
     }
-});
+})
 
 router.get("/Manager", VerificarSesion("Manager"), async (req, res) => {
     try {
-        const products = await walletController.getProducts();
-        const role = req.session.user.rol;
+        const products = await walletController.getProducts()
+        const storeBalance = await walletController.totalBalance()
 
         res.render("cliente", {
             products,
-            role,
-            walletContract: WALLET_CONTRACT
-        });
+            walletContract: WALLET_CONTRACT,
+            role: "Manager",
+            storeBalance
+        })
     } catch (err) {
-        console.error("Error al cargar /Manager:", err);
-        res.status(500).send("Error cargando la tienda");
+        console.error("Error al cargar /Manager:", err)
+        res.status(500).send("Error cargando la tienda")
     }
-});
+})
 
-router.get("/Cliente", VerificarSesion("Cliente"), async (req, res) => {
+router.get("/cliente", VerificarSesion("Cliente"), async (req, res) => {
     try {
-        const products = await walletController.getProducts();
-        const role = req.session.user.rol;
+        const products = await walletController.getProducts()
 
         res.render("cliente", {
             products,
-            role,
-            walletContract: WALLET_CONTRACT
-        });
+            walletContract: WALLET_CONTRACT,
+            role: "Cliente"
+        })
     } catch (err) {
-        console.error("Error al cargar /Cliente:", err);
-        res.status(500).send("Error cargando la tienda");
+        console.error("Error al cargar /cliente:", err)
+        res.status(500).send("Error cargando la tienda")
     }
-});
+})
 
 
 router.post("/login", async (req, res) => {
@@ -119,23 +120,18 @@ router.get("/perfil", VerificarSesion(), async (req, res) => {
     try {
         const wallet = req.session.user.wallet;
 
-        // === 1. INFO DEL USUARIO ===
         const personData = await personalController.getPersonByWallet(wallet);
 
         if (!personData.success) {
             return res.status(400).send("Usuario no encontrado en el contrato");
         }
 
-        // === 2. SALDO DEL USUARIO ===
         const saldo = await walletController.getWalletBalance(wallet);
 
-        // === 3. COMPRAS DEL USUARIO (desde contrato de tienda) ===
         const purchases = await walletController.getPurchasesByUser(wallet);
 
-        // === 4. PRODUCTOS DISPONIBLES ===
         const allProducts = await walletController.getProducts();
 
-        // === 5. UNIR COMPRAS + PRODUCTOS ===
         const movies = purchases.map(p => {
             const product = allProducts.find(prod => Number(prod.id) === Number(p.productId));
 
@@ -158,7 +154,6 @@ router.get("/perfil", VerificarSesion(), async (req, res) => {
             };
         });
 
-        // === 6. RENDERIZAR PERFIL ===
         res.render("perfil", {
             person: personData.person,
             saldo,

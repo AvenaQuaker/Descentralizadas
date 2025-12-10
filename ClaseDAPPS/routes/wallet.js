@@ -1,22 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const {  getContract, createTransaction } = require("../utils/contractHelper.js");
 const contract = require("../artifacts/contracts/Wallet.sol/MultiSignPaymentWallet.json");
-const { WALLET_CONTRACT,OWNER } = process.env;
+const { OWNER } = process.env;
 
 const {
     getProducts,
     addProduct,
     updateProductController,
     deleteProductController,
-    getPurchasesByUser
+    getPurchasesByUser,
+    totalBalance,
+    PagarAlOwner
 } = require("../controllers/wallet.js");
-
 const personalController = require("../controllers/personal.js");
 
-// ===============================
-// GET: Productos
-// ===============================
 router.get("/products", async (req, res) => {
     try {
         const list = await getProducts();
@@ -27,9 +24,6 @@ router.get("/products", async (req, res) => {
     }
 });
 
-// ===============================
-// POST: Crear Producto
-// ===============================
 router.post("/products", async (req, res) => {
     const { name, description, price, stock, imageUrl } = req.body;
     
@@ -44,9 +38,6 @@ router.post("/products", async (req, res) => {
     }
 });
 
-// ===============================
-// PUT: Actualizar producto
-// ===============================
 router.put("/products/:id", async (req, res) => {
     const { id } = req.params;
     const { name, description, price, stock, imageUrl, active } = req.body;
@@ -66,9 +57,6 @@ router.put("/products/:id", async (req, res) => {
     }
 });
 
-// ===============================
-// DELETE: Borrar producto
-// ===============================
 router.delete("/products/:id", async (req, res) => {
     const { id } = req.params;
     
@@ -92,10 +80,6 @@ router.delete("/products/:id", async (req, res) => {
     }
 });
 
-
-// ===============================
-// GET: Compras del usuario
-// ===============================
 router.get("/purchases", async (req, res) => {
     const account = req.session?.user?.wallet;
 
@@ -111,5 +95,37 @@ router.get("/purchases", async (req, res) => {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
+router.get("/balance", async (req, res) => {
+    try {
+        const balance = await totalBalance()
+        return res.json({ success: true, balance })
+    } catch (err) {
+        console.error("Error /api/wallet/balance:", err)
+        return res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+router.post("/withdraw", async (req, res) => {
+    try {
+        const { amount } = req.body 
+
+        if (!amount || Number(amount) <= 0) {
+            return res.status(400).json({ success: false, message: "Cantidad inválida" })
+        }
+
+        const result = await PagarAlOwner(amount)
+
+        if (!result.success) {
+            return res.status(400).json(result)
+        }
+
+        return res.json(result)
+
+    } catch (err) {
+        console.error("Error /api/wallet/withdraw:", err)
+        return res.status(500).json({ success: false, message: err.message })
+    }
+})
 
 module.exports = router;

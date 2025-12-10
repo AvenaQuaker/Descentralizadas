@@ -9,23 +9,13 @@ const {
 
 const { PERSONAL_CONTRACT,WALLET_CONTRACT } = process.env;
 
-
-// --------- GET INSTANCE ----------
 function getInstance() {
     return getContract(PERSONAL_CONTRACT, contract.abi);
 }
 
-
-// --------- SEND TRANSACTION ----------
 async function send(method, params, account) {
     return await createTransaction(PERSONAL_CONTRACT, contract.abi, method, params, account);
 }
-
-
-
-// ======================================================
-// ===============  CREATE PERSON  ======================
-// ======================================================
 
 async function autoRegisterCustomer(wallet, account) {
     try {
@@ -44,12 +34,6 @@ async function autoRegisterCustomer(wallet, account) {
         };
     }
 }
-
-
-
-// ======================================================
-// ===============  LOGIN WEB3  =========================
-// ======================================================
 
 async function loginWithWallet(wallet) {
     const instance = getInstance()
@@ -82,21 +66,9 @@ async function loginWithWallet(wallet) {
     }
 }
 
-
-
-// ======================================================
-// ===============  GET PERSON BY WALLET  ===============
-// ======================================================
-
 async function getPersonByWallet(wallet) {
     return await loginWithWallet(wallet);
 }
-
-
-
-// ======================================================
-// ===============  UPDATE  ========================
-// ======================================================
 
 async function updateBasicData(id, email, username, imageUrl, account) {
     active =true;
@@ -115,7 +87,6 @@ async function updateBasicData(id, email, username, imageUrl, account) {
     }
 }
 
-
 async function updateRole(id, newRole, account) {
     try {
         await send("updateRole", [id, newRole], account);
@@ -131,19 +102,10 @@ async function updateRole(id, newRole, account) {
     }
 }
 
-
-
-// ======================================================
-// ===============  GET ALL PERSONS  ====================
-// ======================================================
-
 async function getAllPersons() {
     try {
         const instance = getInstance();
-
         const persons = await instance.getAllPersons();
-
-        // Muy importante: convertir array de structs a objetos JS normales
         const list = persons.map(p => ({
             id: p.id.toString(),
             email: p.email,
@@ -177,13 +139,9 @@ async function registerPurchase(wallet, purchaseId, productId, amountPaid) {
     try {
         const instance = getInstance();
 
-        // ABI del contrato PersonalManager
         const personalManagerAbi = contract.abi;
-
-        // Convertir el monto a BigNumber
         const parsedAmount = ethers.utils.parseEther(String(amountPaid));
 
-        // Crear la transacción firmada por el admin (índice 1)
         const tx = await createTransaction(
             PERSONAL_CONTRACT,
             personalManagerAbi,
@@ -199,9 +157,6 @@ async function registerPurchase(wallet, purchaseId, productId, amountPaid) {
         return { success: false, message: err.toString() };
     }
 }
-
-
-// ======================================================
 
 module.exports = {
     autoRegisterCustomer,

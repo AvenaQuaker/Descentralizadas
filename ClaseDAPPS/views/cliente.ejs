@@ -9,34 +9,37 @@
     <script src="/js/walletAbi.js"></script>
 </head>
 <body class="min-h-screen bg-center bg-cover bg-[url('/images/fondoBlock.jpg')]" >
+        <nav class="bg-black/80 text-yellow-400 px-6 py-4 flex items-center justify-between">
+        <h1 class="text-2xl font-extrabold tracking-wide">BLOCKBUSTER DAPP</h1>
 
-    <!-- NAVBAR ESTILO BLOCKBUSTER -->
-    <nav class="bb-blue shadow-lg px-6 py-4 flex justify-between items-center border-b-4 border-yellow-400">
-        <h1 class="text-3xl blockbuster-title bb-yellow drop-shadow-lg text-white font-TiltWarp">
-            BLOCKBUSTER STORE
-        </h1>
+        <div class="flex items-center gap-4">
+            <% if (role === 'Admin' || role === 'Manager') { %>
+                <div class="bg-yellow-500/10 border border-yellow-400 px-4 py-2 rounded-lg text-sm">
+                    <span class="font-semibold">Balance tienda:</span>
+                    <span id="store-balance"><%= storeBalance %> ETH</span>
+                </div>
 
-    <form action="/logout" method="POST">
-        <button 
-            class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg shadow-md">
-            Cerrar sesión
-        </button>
-    </form>
+                <button id="withdrawBtn"
+                    class="bg-yellow-400 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-300 transition">
+                    Retirar fondos
+                </button>
+            <% } %>
 
-        <form action="/Perfil" method="GET">
-            <button 
-                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg 
-                font-semibold shadow-md transition">
-                Perfil
-            </button>
-        </form>
+            <a href="/perfil"
+                class="bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-400 transition">
+                Mi Perfil
+            </a>
 
+            <form action="/logout" method="POST">
+                <button
+                    class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
+                    Cerrar sesión
+                </button>
+            </form>
+        </div>
     </nav>
-
-    <!-- CONTENEDOR PRINCIPAL -->
     <div class="max-w-7xl mx-auto px-6 py-10 backdrop-blur-sm rounded-xl mt-10 shadow-xl">
 
-        <!-- GRID DE PRODUCTOS ESTILO BLOCKBUSTER -->
         <div class="grid gap-8 
             grid-cols-1 
             sm:grid-cols-2 
@@ -56,30 +59,23 @@
             Precio: <span class="text-green-400"><%= p.price %> ETH</span>
         </p>
 
+        <!-- ESTA COSA SOLO SI ERES ADMIN -->
         <% if (role === 'Admin') { %>
-
-            <!-- BOTÓN EDITAR (ADMIN) -->
             <button 
                 class="mt-2 w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 rounded-lg"
                 onclick="editProduct('<%= p.id %>', '<%= p.name %>', '<%= p.description %>', '<%= p.price %>', '<%= p.stock %>', '<%= p.imageUrl %>')">
                 Editar
             </button>
-
-            <!-- BOTÓN ELIMINAR (ADMIN) -->
             <button 
                 class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg"
                 onclick="deleteProduct('<%= p.id %>')">
                 Eliminar
             </button>
-
         <% } else { %>
-
-            <!-- BOTÓN RENTAR (CLIENTE) -->
             <button class="mt-2 w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 rounded-lg"
                 onclick="buyMovie('<%= p.id %>', '<%= p.price %>')">
                 RENTAR AHORA
             </button>
-
         <% } %>
 
     </div>
@@ -105,13 +101,12 @@ async function buyMovie(productId, priceInEth) {
             return Swal.fire("Error", "Necesitas MetaMask instalado.", "error");
         }
 
-        // 1) Conectar MetaMask
         await ethereum.request({ method: "eth_requestAccounts" });
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer   = provider.getSigner();
         const userWallet = await signer.getAddress();
             console.log("Pagando desde:", userWallet)
-        // 2) Comprobar saldo
+
         const balance = await provider.getBalance(userWallet);
         const needed = ethers.utils.parseEther(String(priceInEth));
 
@@ -123,9 +118,8 @@ async function buyMovie(productId, priceInEth) {
             });
         }
 
-        // 3) Contrato de la tienda
-        const contractAddress = "<%= walletContract %>";  // lo pasas desde el render
-        const abi = window.WALLET_ABI;                    // cargado en un <script>
+        const contractAddress = "<%= walletContract %>"; 
+        const abi = window.WALLET_ABI;                   
 
         const contract = new ethers.Contract(contractAddress, abi, signer);
 
@@ -135,13 +129,11 @@ async function buyMovie(productId, priceInEth) {
             didOpen: () => Swal.showLoading()
         });
 
-        // 4) Comprar el producto *desde la wallet del usuario*
         const tx = await contract.buyProduct(productId, {
             value: ethers.utils.parseEther(String(priceInEth))
         });
         await tx.wait();
 
-        // 5) Registrar compra en tu backend / PersonalManager
         const res = await fetch("/api/personal/registerPurchase", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -313,6 +305,89 @@ async function deleteProduct(id) {
     }
 }
 
+const withdrawBtn = document.getElementById("withdrawBtn");
+
+  if (withdrawBtn) {
+    withdrawBtn.addEventListener("click", async () => {
+        const { value: amount } = await Swal.fire({
+            title: "Retirar fondos",
+            input: "text",
+            inputLabel: "Cantidad en ETH a retirar",
+            inputPlaceholder: "Ejemplo: 0.05",
+            background: "#111",
+            color: "#fff",
+            showCancelButton: true,
+            confirmButtonText: "Retirar",
+            confirmButtonColor: "#facc15",
+            cancelButtonText: "Cancelar",
+            preConfirm: (val) => {
+                if (!val || isNaN(val) || Number(val) <= 0) {
+                    Swal.showValidationMessage("Ingresa un número válido mayor a 0");
+                    return false;
+                }
+                return val;
+            }
+        });
+
+        if (!amount) return;
+
+        try {
+            Swal.fire({
+                title: "Procesando retiro...",
+                background: "#111",
+                color: "#fff",
+                didOpen: () => Swal.showLoading(),
+                allowOutsideClick: false
+            });
+
+            const res = await fetch("/api/wallet/withdraw", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount })
+            });
+
+            const data = await res.json();
+            Swal.close();
+
+            if (!data.success) {
+                return Swal.fire({
+                    icon: "error",
+                    title: "Error al retirar",
+                    text: data.message || "No se pudo completar el retiro",
+                    background: "#111",
+                    color: "#fff"
+                });
+            }
+
+            Swal.fire({
+                icon: "success",
+                title: "Retiro completado",
+                text: `Tx: ${data.txHash}`,
+                background: "#111",
+                color: "#fff",
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+            const balRes = await fetch("/api/wallet/balance");
+            const balData = await balRes.json();
+            if (balData.success) {
+                const span = document.getElementById("store-balance");
+                if (span) span.textContent = `${balData.balance} ETH`;
+            }
+
+        } catch (err) {
+            console.error(err);
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: err.message || "No se pudo conectar con el servidor",
+                background: "#111",
+                color: "#fff"
+            });
+        }
+    });
+  }
 </script>
 
 </body>
