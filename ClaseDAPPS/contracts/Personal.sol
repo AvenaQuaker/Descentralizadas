@@ -27,15 +27,14 @@ contract PersonalManager {
         uint256 amountPaid;
     }
 
-    // STORAGE
     mapping(uint256 => Person) public persons;
     mapping(address => uint256) public walletToPersonId;
     mapping(uint256 => PurchaseRecord[]) public purchasesByPerson;
 
     uint256 public nextPersonId;
-    uint256[] private personIds;   // <--- AGREGADO
+    uint256[] private personIds;   
 
-    // EVENTS
+    // EVENTOS
     event PersonCreated(uint256 id, address wallet, Role role);
     event PurchaseRegistered(uint256 personId, uint256 productId);
 
@@ -68,13 +67,13 @@ contract PersonalManager {
         });
 
         walletToPersonId[msg.sender] = nextPersonId;
-        personIds.push(nextPersonId); // <--- AGREGADO
+        personIds.push(nextPersonId); 
 
         emit PersonCreated(nextPersonId, msg.sender, Role.Admin);
         nextPersonId++;
     }
 
-    // AUTO-REGISTER CUSTOMER
+    // COSITAS
     function autoRegisterCustomer(address _wallet)
         external
         returns (uint256)
@@ -94,7 +93,7 @@ contract PersonalManager {
         );
 
         walletToPersonId[_wallet] = nextPersonId;
-        personIds.push(nextPersonId); // <--- AGREGADO
+        personIds.push(nextPersonId); 
 
         emit PersonCreated(nextPersonId, _wallet, Role.Customer);
 
@@ -102,7 +101,6 @@ contract PersonalManager {
         return nextPersonId - 1;
     }
 
-    // REGISTER PURCHASE
     function registerPurchase(
         address buyerWallet,
         uint256 purchaseId,
@@ -123,7 +121,7 @@ contract PersonalManager {
         emit PurchaseRegistered(personId, productId);
     }
 
-    // GET PURCHASES
+
     function getPurchasesByPerson(uint256 personId)
         external
         view
@@ -132,7 +130,6 @@ contract PersonalManager {
         return purchasesByPerson[personId];
     }
 
-    // GET PERSON BY WALLET
     function getPersonByWallet(address _wallet)
         external
         view

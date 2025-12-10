@@ -60,16 +60,10 @@ contract MultiSignPaymentWallet {
         roles[msg.sender] = Role.Admin;
     }
 
-    // -------------------------------
-    // ROLES
-    // -------------------------------
     function setRole(address _wallet, Role _role) external onlyAdmin {
         roles[_wallet] = _role;
     }
 
-    // -------------------------------
-    // PRODUCTOS
-    // -------------------------------
     function createProduct(
         string memory _name,
         string memory _description,
@@ -122,9 +116,7 @@ contract MultiSignPaymentWallet {
         emit ProductDeleted(_id);
     }
 
-    // -------------------------------
-    // COMPRAS
-    // -------------------------------
+
     function buyProduct(uint256 _productId) external payable {
         Product storage p = products[_productId];
 
@@ -133,7 +125,6 @@ contract MultiSignPaymentWallet {
         require(p.stock > 0, "Out of stock");
         require(msg.value == p.price, "Incorrect amount");
 
-        // Reducir stock
         p.stock--;
         if (p.stock == 0) {
             p.active = false;
